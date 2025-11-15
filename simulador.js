@@ -1,6 +1,6 @@
 const axios = require("axios");
 
-const API_URL = "http://localhost:3000/api/sensors/data";
+const API_URL = "https://sensor-server-54ak.onrender.com";
 
 // Lista de sensores de ejemplo
 const sensors = [
@@ -49,3 +49,4 @@ sendRandomData();
 
 // Enviar datos cada 5 segundos
 setInterval(sendRandomData, 5000);
+
