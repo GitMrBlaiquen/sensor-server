@@ -9,11 +9,11 @@ app.use(cors());
 app.use(express.json());
 
 // --- Servir el frontend (sensor-app) ---
-app.use(express.static(path.join(__dirname, "../sensor-app")));
+app.use(express.static(path.join(__dirname, "sensor-app")));
 
 // Cuando el usuario entra a la raíz "/", se envia index.html
 app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "../sensor-app", "index.html"));
+  res.sendFile(path.join(__dirname, "sensor-app", "index.html"));
 });
 
 // --------------------------------------------------------------
@@ -118,6 +118,7 @@ const PORT = process.env.PORT || 10000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Servidor activo en Render en el puerto ${PORT}`);
 });
+
 
 
 
