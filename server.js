@@ -1,10 +1,24 @@
 const express = require("express");
 const cors = require("cors");
+const path = require("path");
 
 const app = express();
 
+// --- Middlewares ---
 app.use(cors());
 app.use(express.json());
+
+// --- Servir el frontend (sensor-app) ---
+app.use(express.static(path.join(__dirname, "../sensor-app")));
+
+// Cuando el usuario entra a la raíz "/", se envia index.html
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "../sensor-app", "index.html"));
+});
+
+// --------------------------------------------------------------
+// ----------------------   API SENSORES   ----------------------
+// --------------------------------------------------------------
 
 // Estado en memoria: último dato por sensor
 const sensors = {};
@@ -33,14 +47,15 @@ app.post("/api/sensors/data", (req, res) => {
   res.json({ status: "ok" });
 });
 
-// ---------- ALERTAS ----------
+// --------------------------------------------------------------
+// ------------------------    ALERTAS    ------------------------
+// --------------------------------------------------------------
 
 // Lista de alertas en memoria
-// Cada alerta: { id, type, message, source, busId, timestamp }
 let nextAlertId = 1;
 const alerts = [];
 
-// POST /api/alerts  -> registrar nueva alerta
+// POST /api/alerts -> registrar nueva alerta
 app.post("/api/alerts", (req, res) => {
   let { type, message, source, busId } = req.body;
 
@@ -52,20 +67,18 @@ app.post("/api/alerts", (req, res) => {
 
   const alert = {
     id: nextAlertId++,
-    type,                    // robo, disturbio, emergencia, etc.
-    message,                 // texto libre
-    busId,                   // bus al que corresponde la alerta
-    source: source || "app", // desde dónde vino (opcional)
+    type,
+    message,
+    busId,
+    source: source || "app",
     timestamp: new Date(),
   };
 
-  // Insertar al principio (más reciente primero)
+  // Insertar al principio
   alerts.unshift(alert);
 
-  // Limitar a las últimas 50 alertas
-  if (alerts.length > 50) {
-    alerts.pop();
-  }
+  // Limitar a 50 alertas
+  if (alerts.length > 50) alerts.pop();
 
   console.log("Alerta recibida:", alert);
 
@@ -77,7 +90,11 @@ app.get("/api/alerts", (req, res) => {
   res.json(alerts);
 });
 
-// GET /api/sensors
+// --------------------------------------------------------------
+// ------------------------    SENSORES   ------------------------
+// --------------------------------------------------------------
+
+// GET /api/sensors -> lista completa
 app.get("/api/sensors", (req, res) => {
   const list = Object.values(sensors).map((s) => ({
     ...s,
@@ -86,15 +103,21 @@ app.get("/api/sensors", (req, res) => {
   res.json(list);
 });
 
-// GET /api/sensors/:id
+// GET /api/sensors/:id -> sensor individual
 app.get("/api/sensors/:id", (req, res) => {
   const sensor = sensors[req.params.id];
   if (!sensor) return res.status(404).json({ error: "Sensor no encontrado" });
   res.json(sensor);
 });
 
+// --------------------------------------------------------------
+// ---------------------   INICIO DEL SERVER   ------------------
+// --------------------------------------------------------------
+
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Servidor de sensores accesible en tu red local en el puerto ${PORT}`);
+  console.log(`Servidor activo en Render en el puerto ${PORT}`);
 });
+
+
 
