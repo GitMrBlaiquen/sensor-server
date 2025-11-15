@@ -93,7 +93,8 @@ app.get("/api/sensors/:id", (req, res) => {
   res.json(sensor);
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Servidor de sensores accesible en tu red local en el puerto ${PORT}`);
 });
+
