@@ -39,11 +39,13 @@ const users = {
   Vicente: {
     username: "Vicente",
     password: "Admin09867",
+    role: "admin",
     stores: Object.keys(stores), // todas las tiendas
   },
   Rodrigo: {
     username: "Rodrigo",
     password: "Admin170817",
+    role: "admin",
     stores: Object.keys(stores), // todas las tiendas
   },
 
@@ -51,6 +53,7 @@ const users = {
   Arrow: {
     username: "Arrow",
     password: "Arrow57105",
+    role: "dueno",
     stores: ["arrow-01", "arrow-02", "arrow-03"],
   },
 
@@ -58,6 +61,7 @@ const users = {
   Leoniza: {
     username: "Leoniza",
     password: "Leoniza99481",
+    role: "dueno",
     stores: ["leoniza-01", "leoniza-02", "leoniza-03", "leoniza-04"],
   },
 };
@@ -198,4 +202,5 @@ const PORT = process.env.PORT || 10000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Servidor TIENDAS activo en el puerto ${PORT}`);
 });
+
 
