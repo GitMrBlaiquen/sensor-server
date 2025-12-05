@@ -2,16 +2,18 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>Panel de Sensores</title>
+  <title>Panel de Contador de Personas - Tienda</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <header>
     <img src="logo.png" alt="logo" class="logo">
-    <h1>Panel de sensores - Proyecto de contador de personas y otras características</h1>
+    <h1>Panel de personas en tienda comercial</h1>
+    <p>Contador en tiempo real de entradas y salidas.</p>
   </header>
 
   <main>
+    <!-- Barra de control -->
     <section class="toolbar">
       <button id="refreshBtn">Actualizar ahora</button>
       <label>
@@ -25,46 +27,14 @@
       </label>
     </section>
 
-    <!-- Panel de sensores -->
+    <!-- Panel principal: contador de personas -->
     <section id="sensorsContainer">
-      <!-- Aquí aparecerán los sensores -->
-    </section>
-
-    <!-- Panel de alertas: formulario + lista -->
-    <section class="alerts-panel">
-      <div class="alerts-form">
-        <h2>Reportar incidente</h2>
-        <form id="alertForm">
-          <label for="alertType">Tipo de alerta</label>
-          <select id="alertType" required>
-            <option value="robo">Robo / asalto</option>
-            <option value="disturbio">Disturbio / pelea</option>
-            <option value="emergencia_medica">Emergencia médica</option>
-            <option value="falla_bus">Falla del bus</option>
-            <option value="otro">Otro</option>
-          </select>
-
-          <label for="alertBusId">Bus</label>
-          <input id="alertBusId" type="text" placeholder="Ej: 123" required />
-
-          <label for="alertMessage">Descripción (opcional)</label>
-          <textarea id="alertMessage" rows="3" placeholder="Explica brevemente qué está pasando..."></textarea>
-
-          <button type="submit">Enviar alerta</button>
-        </form>
-      </div>
-
-      <div class="alerts-list">
-        <h2>Alertas recientes</h2>
-        <div id="alertsContainer">
-          <!-- Aquí se mostrarán las alertas -->
-        </div>
-      </div>
+      <!-- Aquí se mostrará el resumen de entradas / salidas / dentro -->
     </section>
   </main>
 
   <footer>
-    <small>Proyecto de prueba creado por Vicente Becerra – Dashboard de Sensores</small>
+    <small>Proyecto creado por Vicente Becerra – Contador de Personas para Tiendas Comerciales</small>
   </footer>
 
   <script src="app.js"></script>
