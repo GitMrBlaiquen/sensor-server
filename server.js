@@ -1,225 +1,178 @@
-// URL base de la API
-const BASE_URL = window.location.origin;
-// Para pruebas locales, puedes usar:
-// const BASE_URL = "http://localhost:10000";
+const express = require("express");
+const cors = require("cors");
+const path = require("path");
 
-const LOGIN_URL = `${BASE_URL}/api/login`;
-const COUNTERS_URL = `${BASE_URL}/api/store/counters`;
+const app = express();
 
-const sensorsContainer = document.getElementById("sensorsContainer");
-const refreshBtn = document.getElementById("refreshBtn");
-const refreshSelect = document.getElementById("refreshInterval");
+// --- Middlewares ---
+app.use(cors());
+app.use(express.json());
 
-// Login
-const loginPanel = document.getElementById("loginPanel");
-const mainContent = document.getElementById("mainContent");
-const usernameInput = document.getElementById("usernameInput");
-const passwordInput = document.getElementById("passwordInput");
-const loginBtn = document.getElementById("loginBtn");
-const loginStatus = document.getElementById("loginStatus");
+// --- Servir el frontend (sensor-app) ---
+app.use(express.static(path.join(__dirname, "sensor-app")));
 
-// Selector de tienda
-const storeSelectorSection = document.getElementById("storeSelectorSection");
-const storeSelect = document.getElementById("storeSelect");
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "sensor-app", "index.html"));
+});
 
-let autoRefreshId = null;
+// --------------------------------------------------------------
+// ---------   MODELO EN MEMORIA: USUARIOS Y TIENDAS   ----------
+// --------------------------------------------------------------
 
-// Estado actual
-let currentUser = null;
-let currentStores = [];
-let currentStoreId = null;
+// Tiendas disponibles
+const stores = {
+  "tienda-1": { id: "tienda-1", name: "Tienda 1 - Centro" },
+  "tienda-2": { id: "tienda-2", name: "Tienda 2 - Mall" },
+};
 
-// -------- LOGIN --------
+// Usuarios de ejemplo (2 dueños, cada uno con su tienda)
+// Contraseñas DEMO
+const users = {
+  dueno1: {
+    username: "dueno1",
+    password: "1234",
+    stores: ["tienda-1"],
+  },
+  dueno2: {
+    username: "dueno2",
+    password: "5678",
+    stores: ["tienda-2"],
+  },
+};
 
-async function login() {
-  const username = usernameInput.value.trim();
-  const password = passwordInput.value.trim();
+// --------------------------------------------------------------
+// ---------------------   LOGIN DE USUARIOS   ------------------
+// --------------------------------------------------------------
+
+// POST /api/login
+// Body: { username: "dueno1", password: "1234" }
+// Respuesta: { username, stores: [ {id, name}, ... ] }
+app.post("/api/login", (req, res) => {
+  const { username, password } = req.body;
 
   if (!username || !password) {
-    loginStatus.textContent = "Ingresa usuario y contraseña.";
-    loginStatus.style.color = "red";
-    return;
+    return res.status(400).json({ error: "Faltan username o password" });
   }
 
-  try {
-    loginStatus.textContent = "Ingresando...";
-    loginStatus.style.color = "inherit";
-
-    const res = await fetch(LOGIN_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ username, password }),
-    });
-
-    if (!res.ok) {
-      if (res.status === 401) {
-        throw new Error("Usuario o contraseña incorrectos.");
-      }
-      throw new Error("Error en el login.");
-    }
-
-    const data = await res.json();
-    currentUser = data.username;
-    currentStores = data.stores || [];
-
-    if (currentStores.length === 0) {
-      loginStatus.textContent = "El usuario no tiene tiendas asignadas.";
-      loginStatus.style.color = "red";
-      return;
-    }
-
-    // Llenar el selector de tiendas
-    fillStoreSelect();
-    storeSelectorSection.style.display = "block";
-
-    loginStatus.textContent = "";
-    // Ocultar login y mostrar panel principal
-    loginPanel.style.display = "none";
-    mainContent.style.display = "block";
-
-    // Cargar la primera tienda
-    currentStoreId = currentStores[0].id;
-    loadSensors();
-  } catch (err) {
-    console.error(err);
-    loginStatus.textContent = err.message || "No se pudo iniciar sesión.";
-    loginStatus.style.color = "red";
+  const user = users[username];
+  if (!user || user.password !== password) {
+    return res.status(401).json({ error: "Usuario o contraseña inválidos" });
   }
-}
 
-function fillStoreSelect() {
-  storeSelect.innerHTML = "";
-  currentStores.forEach((store) => {
-    const opt = document.createElement("option");
-    opt.value = store.id;
-    opt.textContent = store.name || store.id;
-    storeSelect.appendChild(opt);
+  const userStores = user.stores
+    .map((storeId) => stores[storeId])
+    .filter(Boolean);
+
+  return res.json({
+    username: user.username,
+    stores: userStores,
   });
+});
 
-  if (currentStores.length > 0) {
-    currentStoreId = currentStores[0].id;
-    storeSelect.value = currentStoreId;
+// --------------------------------------------------------------
+// -----------   CONTADOR DE PERSONAS POR TIENDA   --------------
+// --------------------------------------------------------------
+
+// Último dato por sensor (para debug)
+const sensors = {};
+
+// Contadores por tienda:
+// storeCounters["tienda-1"] = { entradas: X, salidas: Y }
+const storeCounters = {};
+
+function ensureStore(storeId) {
+  if (!storeCounters[storeId]) {
+    storeCounters[storeId] = { entradas: 0, salidas: 0 };
   }
 }
 
-// Cambiar tienda seleccionada
-storeSelect.addEventListener("change", () => {
-  currentStoreId = storeSelect.value;
-  loadSensors();
-});
+// POST /api/sensors/data
+// Espera algo como:
+// {
+//   storeId: "tienda-1",
+//   deviceId: "t1-puerta-entrada",
+//   type: "entrada" | "salida",
+//   value: 1,
+//   unit: "personas"
+// }
+app.post("/api/sensors/data", (req, res) => {
+  const { storeId, deviceId, type, value, unit, extra } = req.body;
 
-// Click en login
-loginBtn.addEventListener("click", login);
-
-// Enter en inputs
-usernameInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") login();
-});
-passwordInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") login();
-});
-
-// -------- CONTADOR TIENDA (ENTRADAS / SALIDAS) --------
-
-async function loadSensors() {
-  if (!currentStoreId) {
-    sensorsContainer.innerHTML =
-      "<p>Inicia sesión y selecciona una tienda para ver los datos.</p>";
-    return;
+  if (!storeId) {
+    return res.status(400).json({ error: "Falta storeId" });
+  }
+  if (!deviceId) {
+    return res.status(400).json({ error: "Falta deviceId" });
   }
 
-  try {
-    sensorsContainer.innerHTML = "<p>Cargando datos de la tienda...</p>";
+  const now = new Date();
+  const numericValue = value !== undefined ? Number(value) : 1;
+  const safeValue = isNaN(numericValue) ? 1 : numericValue;
 
-    const url = `${COUNTERS_URL}?storeId=${encodeURIComponent(currentStoreId)}`;
-    const res = await fetch(url);
-    if (!res.ok) {
-      throw new Error("Error al obtener los contadores: " + res.status);
-    }
+  // Guardar último dato del sensor
+  const sensorKey = `${storeId}:${deviceId}`;
+  sensors[sensorKey] = {
+    storeId,
+    deviceId,
+    type: type || "desconocido",
+    value: safeValue,
+    unit: unit || "",
+    extra: extra || {},
+    lastUpdate: now,
+  };
 
-    const data = await res.json();
-    renderStoreCounters(data);
-  } catch (err) {
-    console.error(err);
-    sensorsContainer.innerHTML =
-      `<p style="color:red;">No se pudieron cargar los datos de la tienda. Revisa el servidor.</p>`;
+  // Actualizar contadores de la tienda
+  ensureStore(storeId);
+  if (type === "entrada") {
+    storeCounters[storeId].entradas += safeValue;
+  } else if (type === "salida") {
+    storeCounters[storeId].salidas += safeValue;
   }
-}
 
-function renderStoreCounters(counters) {
-  if (!counters) {
-    sensorsContainer.innerHTML = "<p>No hay datos disponibles aún.</p>";
-    return;
-  }
+  console.log("Dato recibido:", sensors[sensorKey]);
+  console.log(
+    `Tienda ${storeId} -> Entradas: ${storeCounters[storeId].entradas}, Salidas: ${storeCounters[storeId].salidas}`
+  );
 
-  const { storeId, entradas = 0, salidas = 0, dentro = 0 } = counters;
-
-  sensorsContainer.innerHTML = "";
-
-  const card = document.createElement("article");
-  card.className = "sensor-card";
-
-  const nowStr = new Date().toLocaleTimeString();
-
-  // Nombre de tienda
-  let storeName = storeId;
-  const found = currentStores.find((s) => s.id === storeId);
-  if (found && found.name) storeName = found.name;
-
-  card.innerHTML = `
-    <div class="sensor-header">
-      <div class="sensor-id">${storeName}</div>
-      <div class="sensor-type">Contador de personas</div>
-    </div>
-
-    <div class="store-counters">
-      <div class="store-counter-item">
-        <span class="label">Personas que han ENTRADO</span>
-        <span class="value">${entradas}</span>
-      </div>
-      <div class="store-counter-item">
-        <span class="label">Personas que han SALIDO</span>
-        <span class="value">${salidas}</span>
-      </div>
-      <div class="store-counter-item">
-        <span class="label">Personas DENTRO de la tienda</span>
-        <span class="value">${dentro}</span>
-      </div>
-    </div>
-
-    <div class="sensor-meta">
-      Última actualización: ${nowStr}
-    </div>
-  `;
-
-  sensorsContainer.appendChild(card);
-}
-
-// -------- CONTROLES GENERALES --------
-
-// Botón de refresco manual
-refreshBtn.addEventListener("click", () => {
-  loadSensors();
+  res.json({ status: "ok" });
 });
 
-// Auto-actualización
-refreshSelect.addEventListener("change", () => {
-  const interval = Number(refreshSelect.value);
+// GET /api/store/counters?storeId=tienda-1
+// Devuelve contadores de UNA tienda
+app.get("/api/store/counters", (req, res) => {
+  const { storeId } = req.query;
 
-  if (autoRefreshId) {
-    clearInterval(autoRefreshId);
-    autoRefreshId = null;
+  if (!storeId) {
+    return res.status(400).json({ error: "Falta storeId en la query" });
   }
 
-  if (interval > 0) {
-    autoRefreshId = setInterval(() => {
-      loadSensors();
-    }, interval);
-  }
+  ensureStore(storeId);
+  const { entradas, salidas } = storeCounters[storeId];
+  const dentro = Math.max(entradas - salidas, 0);
+
+  res.json({
+    storeId,
+    entradas,
+    salidas,
+    dentro,
+  });
 });
 
-// Mensaje inicial
-sensorsContainer.innerHTML =
-  "<p>Inicia sesión para ver el contador de personas.</p>";
+// (Opcional) lista de todas las tiendas
+app.get("/api/stores", (req, res) => {
+  res.json(Object.values(stores));
+});
+
+// (Opcional) debug de sensores
+app.get("/api/sensors", (req, res) => {
+  res.json(Object.values(sensors));
+});
+
+// --------------------------------------------------------------
+// ---------------------   INICIO DEL SERVER   ------------------
+// --------------------------------------------------------------
+
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Servidor TIENDAS activo en el puerto ${PORT}`);
+});
