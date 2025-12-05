@@ -1,88 +1,235 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8" />
-  <title>Panel de Contador de Personas - Tiendas</title>
-  <link rel="stylesheet" href="style.css" />
-</head>
-<body>
-  <header>
-    <img src="logo.png" alt="logo" class="logo">
-    <h1>Panel de personas en tiendas comerciales</h1>
-    <p>Contador en tiempo real de entradas y salidas por tienda.</p>
-  </header>
+* {
+  box-sizing: border-box;
+}
 
-  <!-- PANEL DE LOGIN (pantalla inicial) -->
-  <section class="login-panel" id="loginPanel">
-    <h2>Iniciar sesión</h2>
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #c2bcd3;
+  color: #0A2342;
+}
 
-    <div class="login-card">
-      <div class="input-group">
-        <span class="input-icon">👤</span>
-        <input
-          id="usernameInput"
-          type="text"
-          placeholder="Usuario (Vicente, Rodrigo, Leoniza, Arrow)"
-        />
-      </div>
+/* ---------------- HEADER ---------------- */
 
-      <div class="input-group">
-        <span class="input-icon">🔒</span>
-        <input
-          id="passwordInput"
-          type="password"
-          placeholder="Contraseña"
-        />
-      </div>
+header {
+  background: linear-gradient(90deg, #0A2342, #1C6DD0);
+  color: white;
+  padding: 20px 28px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 3px solid #4DA9FF;
+}
 
-      <button id="loginBtn">Entrar</button>
-      <div id="loginStatus" class="login-status"></div>
-    </div>
-  </section>
+header h1 {
+  margin: 0;
+  font-size: 1.4rem;
+}
 
-  <!-- CONTENIDO PRINCIPAL (se muestra SOLO tras login) -->
-  <main id="mainContent" style="display: none;">
+.logo {
+  height: 70px;       
+  margin-right: 12px;
+  object-fit: contain;
+}
 
-    <!-- Barra superior: usuario + logout -->
-    <section class="toolbar">
-      <div class="toolbar-left">
-        <span id="userInfo"></span>
-      </div>
+/* ---------------- LOGIN PANEL ---------------- */
 
-      <div class="toolbar-right">
-        <button id="refreshBtn">Actualizar ahora</button>
-        <label>
-          Auto-actualizar cada
-          <select id="refreshInterval">
-            <option value="0">No auto</option>
-            <option value="5000">5 s</option>
-            <option value="10000" selected>10 s</option>
-            <option value="30000">30 s</option>
-          </select>
-        </label>
-        <button id="logoutBtn" class="logout-btn">Cerrar sesión</button>
-      </div>
-    </section>
+.login-panel {
+  max-width: 400px;
+  margin: 40px auto;
+  background: #d7dde5;
+  padding: 24px;
+  border-radius: 14px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+  border-left: 6px solid #1C6DD0;
+}
 
-    <!-- Selector de tienda -->
-    <section class="store-selector" id="storeSelectorSection">
-      <h2>Seleccionar tienda</h2>
-      <label>
-        Tienda:
-        <select id="storeSelect"></select>
-      </label>
-    </section>
+.login-panel h2 {
+  margin-top: 0;
+  text-align: center;
+}
 
-    <!-- Panel principal: contador de personas -->
-    <section id="sensorsContainer">
-      <!-- Aquí se mostrará el resumen de entradas / salidas / dentro -->
-    </section>
-  </main>
+.login-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
 
-  <footer>
-    <small>Proyecto creado por Vicente Becerra – Contador de Personas para Tiendas Comerciales</small>
-  </footer>
+.login-controls input {
+  padding: 10px;
+  border-radius: 8px;
+  border: 2px solid #1C6DD0;
+}
 
-  <script src="app.js"></script>
-</body>
-</html>
+.login-controls button {
+  padding: 10px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  background: #1C6DD0;
+  color: white;
+  box-shadow: 0 4px 10px rgba(28, 109, 208, 0.4);
+  transition: 0.2s;
+}
+
+.login-controls button:hover {
+  background: #4DA9FF;
+  transform: translateY(-2px);
+}
+
+/* ---------------- MAIN CONTENT ---------------- */
+
+main {
+  padding: 16px 24px 40px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+/* ---------------- USER INFO + LOGOUT ---------------- */
+
+.user-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  background: #dfe3eb;
+  padding: 12px 16px;
+  border-radius: 10px;
+  border-left: 5px solid #1C6DD0;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.user-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.user-icon {
+  font-size: 18px;
+}
+
+.user-name {
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.user-role {
+  font-size: 0.9rem;
+  opacity: 0.8;
+  margin-left: 4px;
+}
+
+.logout-btn {
+  background: #c0392b;
+  color: white;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.logout-btn:hover {
+  background: #e74c3c;
+  transform: translateY(-2px);
+}
+
+/* ---------------- TOOLBAR ---------------- */
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+button {
+  padding: 10px 18px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  background: #1C6DD0;
+  color: white;
+  box-shadow: 0 4px 10px rgba(28, 109, 208, 0.4);
+  transition: 0.2s;
+}
+
+button:hover {
+  background: #4DA9FF;
+  transform: translateY(-2px);
+}
+
+/* ---------------- SENSOR GRID ---------------- */
+
+#sensorsContainer {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+/* ---------------- SENSOR CARD ---------------- */
+
+.sensor-card {
+  background: #d7dde5;
+  border-radius: 14px;
+  padding: 18px 20px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+  border-left: 6px solid #1C6DD0;
+  transition: 0.2s;
+}
+
+.sensor-card:hover {
+  transform: translateY(-3px);
+  border-left-color: #4DA9FF;
+}
+
+.sensor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+
+.sensor-id {
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.sensor-type {
+  font-size: 0.8rem;
+  color: #555;
+}
+
+/* Valores */
+
+.store-counters {
+  margin-top: 10px;
+}
+
+.store-counter-item {
+  margin-bottom: 6px;
+}
+
+.store-counter-item .label {
+  font-size: 0.95rem;
+}
+
+.store-counter-item .value {
+  font-weight: 700;
+  color: #1C6DD0;
+  font-size: 1.3rem;
+}
+
+/* Footer */
+
+footer {
+  text-align: center;
+  padding: 12px 0 16px;
+  font-size: 0.85rem;
+  color: #0A2342;
+  opacity: 0.8;
+}
