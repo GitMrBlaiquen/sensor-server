@@ -21,22 +21,44 @@ app.get("/", (req, res) => {
 
 // Tiendas disponibles
 const stores = {
-  "tienda-1": { id: "tienda-1", name: "Tienda 1 - Centro" },
-  "tienda-2": { id: "tienda-2", name: "Tienda 2 - Mall" },
+  // Tiendas de Arrow
+  "arrow-01": { id: "arrow-01", name: "Tienda Arrow 01" },
+  "arrow-02": { id: "arrow-02", name: "Tienda Arrow 02" },
+  "arrow-03": { id: "arrow-03", name: "Tienda Arrow 03" },
+
+  // Tiendas de Leoniza
+  "leoniza-01": { id: "leoniza-01", name: "Tienda Leoniza 01" },
+  "leoniza-02": { id: "leoniza-02", name: "Tienda Leoniza 02" },
+  "leoniza-03": { id: "leoniza-03", name: "Tienda Leoniza 03" },
+  "leoniza-04": { id: "leoniza-04", name: "Tienda Leoniza 04" },
 };
 
-// Usuarios de ejemplo (2 dueños, cada uno con su tienda)
-// Contraseñas DEMO
+// Usuarios del sistema
 const users = {
-  dueno1: {
-    username: "dueno1",
-    password: "1234",
-    stores: ["tienda-1"],
+  // Administradores: ven TODAS las tiendas
+  Vicente: {
+    username: "Vicente",
+    password: "Admin09867",
+    stores: Object.keys(stores), // todas las tiendas
   },
-  dueno2: {
-    username: "dueno2",
-    password: "5678",
-    stores: ["tienda-2"],
+  Rodrigo: {
+    username: "Rodrigo",
+    password: "Admin170817",
+    stores: Object.keys(stores), // todas las tiendas
+  },
+
+  // Arrow: solo sus 3 tiendas
+  Arrow: {
+    username: "Arrow",
+    password: "Arrow57105",
+    stores: ["arrow-01", "arrow-02", "arrow-03"],
+  },
+
+  // Leoniza: sus 4 tiendas
+  Leoniza: {
+    username: "Leoniza",
+    password: "Leoniza99481",
+    stores: ["leoniza-01", "leoniza-02", "leoniza-03", "leoniza-04"],
   },
 };
 
@@ -176,3 +198,4 @@ const PORT = process.env.PORT || 10000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Servidor TIENDAS activo en el puerto ${PORT}`);
 });
+
