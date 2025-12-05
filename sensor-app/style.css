@@ -14,8 +14,10 @@ header {
   color: white;
   padding: 20px 28px;
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;     /* logo arriba, textos abajo */
+  align-items: center;        /* centrado horizontal */
+  text-align: center;         /* centra los textos */
+  gap: 8px;
   border-bottom: 3px solid #4DA9FF;
 }
 
@@ -191,4 +193,5 @@ footer {
 .store-selector label select {
   margin-left: 4px;
 }
+
 
