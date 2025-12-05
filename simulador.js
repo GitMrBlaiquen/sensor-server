@@ -1,14 +1,14 @@
 const axios = require("axios");
 
-// URL correcta para enviar datos al backend en Render
+// 🔹 URL del backend:
+// Recordar usar la de Render o la local
+// const API_URL = "http://localhost:10000/api/sensors/data";
 const API_URL = "https://sensor-server-54ak.onrender.com/api/sensors/data";
 
-// Lista de sensores de ejemplo
+// Sensores: puerta de entrada y puerta de salida de la tienda
 const sensors = [
-  { deviceId: "puerta-delantera", type: "contador_personas", unit: "personas" },
-  { deviceId: "puerta-trasera", type: "contador_personas", unit: "personas" },
-  { deviceId: "temperatura-bus", type: "temperatura", unit: "°C" },
-  { deviceId: "asientos-disponibles", type: "asientos", unit: "asientos" }
+  { deviceId: "puerta-entrada", type: "entrada" },
+  { deviceId: "puerta-salida", type: "salida" },
 ];
 
 function randomInt(min, max) {
@@ -17,23 +17,16 @@ function randomInt(min, max) {
 
 async function sendRandomData() {
   for (const s of sensors) {
-    let value;
+    // Personas que entran/salen en este intervalo
+    const value = randomInt(0, 5); // entre 0 y 5 personas cada 5 segundos
 
-    if (s.type === "contador_personas") {
-      value = randomInt(0, 60);    // 0–60 personas
-    } else if (s.type === "temperatura") {
-      value = randomInt(18, 35);   // 18–35 °C
-    } else if (s.type === "asientos") {
-      value = randomInt(0, 40);   // Asientos disponibles
-    } else {
-      value = randomInt(0, 100);
-    }
+    if (value === 0) continue; // a veces nadie entra/sale
 
     const body = {
       deviceId: s.deviceId,
-      type: s.type,
-      value,
-      unit: s.unit,
+      type: s.type,  // "entrada" o "salida"
+      value,         // cuántas personas
+      unit: "personas",
     };
 
     try {
@@ -50,3 +43,5 @@ sendRandomData();
 
 // Enviar datos cada 5 segundos
 setInterval(sendRandomData, 5000);
+
+
