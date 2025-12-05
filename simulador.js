@@ -1,11 +1,29 @@
 const axios = require("axios");
 
-// URL del backend
+// URL del backend (Render)
 const API_URL = "https://sensor-server-54ak.onrender.com/api/sensors/data";
-// Para pruebas en local:
+// Para probar en local, puedes usar:
 // const API_URL = "http://localhost:10000/api/sensors/data";
 
-// Sensores de todas las tiendas
+// -------------------------------------------------------------
+// PERFILES DE TIENDAS (más o menos movimiento)
+// -------------------------------------------------------------
+// enterMin / enterMax = cuánta gente entra por ciclo (cuando hay entradas)
+// exitMax = máximo de personas que pueden salir por ciclo
+const storeProfiles = {
+  // Arrow
+  "arrow-01": { enterMin: 2, enterMax: 7, exitMax: 6 }, // muy concurrida
+  "arrow-02": { enterMin: 1, enterMax: 4, exitMax: 4 }, // media
+  "arrow-03": { enterMin: 0, enterMax: 2, exitMax: 2 }, // tranquila
+
+  // Leoniza
+  "leoniza-01": { enterMin: 0, enterMax: 3, exitMax: 3 }, // tranquila
+  "leoniza-02": { enterMin: 1, enterMax: 5, exitMax: 4 }, // media
+  "leoniza-03": { enterMin: 0, enterMax: 2, exitMax: 2 }, // tranquila
+  "leoniza-04": { enterMin: 3, enterMax: 8, exitMax: 6 }, // muy concurrida
+};
+
+// Sensores de todas las tiendas (entrada y salida)
 const sensors = [
   // Arrow
   { storeId: "arrow-01", deviceId: "arrow01-entrada", type: "entrada" },
@@ -31,7 +49,7 @@ const sensors = [
   { storeId: "leoniza-04", deviceId: "leoniza04-salida", type: "salida" },
 ];
 
-// Estado local: cuántas personas hay dentro según el simulador
+// Estado local de cuántas personas hay dentro por tienda
 const storeState = {}; // { [storeId]: { inside: number } }
 
 function ensureStoreState(storeId) {
@@ -41,30 +59,32 @@ function ensureStoreState(storeId) {
 }
 
 function randomInt(min, max) {
+  if (max <= min) return min;
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
 async function sendRandomData() {
   for (const s of sensors) {
+    const profile = storeProfiles[s.storeId] || { enterMin: 0, enterMax: 3, exitMax: 3 };
     ensureStoreState(s.storeId);
 
     let value = 0;
 
     if (s.type === "entrada") {
-      // Simulamos entradas
-      value = randomInt(0, 5);
-      if (value === 0) continue;
+      // Entradas según el perfil de la tienda
+      value = randomInt(profile.enterMin, profile.enterMax);
+      if (value <= 0) continue;
 
       storeState[s.storeId].inside += value;
     } else if (s.type === "salida") {
-      // No pueden salir más de los que hay dentro
       const currentInside = storeState[s.storeId].inside;
       if (currentInside <= 0) continue;
 
-      const maxSalidaPosible = Math.min(currentInside, randomInt(0, 5));
-      if (maxSalidaPosible === 0) continue;
+      // No pueden salir más de los que hay dentro
+      const maxTeorico = Math.min(profile.exitMax, currentInside);
+      value = randomInt(0, maxTeorico);
+      if (value <= 0) continue;
 
-      value = maxSalidaPosible;
       storeState[s.storeId].inside -= value;
     } else {
       continue;
@@ -79,18 +99,20 @@ async function sendRandomData() {
     };
 
     try {
-      const res = await axios.post(API_URL, body);
-      console.log("✔️ Enviado:", body, "→ dentro simulador:", storeState[s.storeId].inside);
+      await axios.post(API_URL, body);
+      console.log(
+        `✔️ ${s.storeId} ${s.type} +${value} → dentro ahora: ${storeState[s.storeId].inside}`
+      );
     } catch (err) {
       console.error("❌ Error enviando datos:", err.message);
     }
   }
 
-  console.log("📊 Estado actual (simulador):", storeState);
+  console.log("📊 Estado simulador:", storeState);
 }
 
-// Esperar 3 segundos para que Render despierte
+// Espera 3 segundos para que Render despierte
 setTimeout(sendRandomData, 3000);
 
-// Luego cada 5 segundos
+// Luego envía datos cada 5 segundos
 setInterval(sendRandomData, 5000);
