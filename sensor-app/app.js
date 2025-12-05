@@ -1,25 +1,126 @@
 // URL base de la API
-// Si lo sirves desde Render, usar window.location.origin hace que apunte
-// automáticamente al mismo dominio del servidor.
 const BASE_URL = window.location.origin;
-// Si quieres probar en local, puedes comentar la de arriba y usar esta:
+// Para pruebas locales, puedes usar:
 // const BASE_URL = "http://localhost:10000";
 
+const LOGIN_URL = `${BASE_URL}/api/login`;
 const COUNTERS_URL = `${BASE_URL}/api/store/counters`;
 
 const sensorsContainer = document.getElementById("sensorsContainer");
 const refreshBtn = document.getElementById("refreshBtn");
 const refreshSelect = document.getElementById("refreshInterval");
 
+const usernameInput = document.getElementById("usernameInput");
+const loginBtn = document.getElementById("loginBtn");
+const loginStatus = document.getElementById("loginStatus");
+
+const storeSelectorSection = document.getElementById("storeSelectorSection");
+const storeSelect = document.getElementById("storeSelect");
+
 let autoRefreshId = null;
+
+// Estado actual
+let currentUser = null;
+let currentStores = [];
+let currentStoreId = null;
+
+// -------- LOGIN --------
+
+async function login() {
+  const username = usernameInput.value.trim();
+
+  if (!username) {
+    loginStatus.textContent = "Ingresa un usuario.";
+    loginStatus.style.color = "red";
+    return;
+  }
+
+  try {
+    loginStatus.textContent = "Ingresando...";
+    loginStatus.style.color = "inherit";
+
+    const res = await fetch(LOGIN_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ username }),
+    });
+
+    if (!res.ok) {
+      if (res.status === 401) {
+        throw new Error("Usuario no encontrado. Prueba con dueno1 o dueno2.");
+      }
+      throw new Error("Error en el login.");
+    }
+
+    const data = await res.json();
+    currentUser = data.username;
+    currentStores = data.stores || [];
+
+    if (currentStores.length === 0) {
+      loginStatus.textContent = "El usuario no tiene tiendas asignadas.";
+      loginStatus.style.color = "red";
+      storeSelectorSection.style.display = "none";
+      sensorsContainer.innerHTML = "<p>Este usuario no tiene tiendas para mostrar.</p>";
+      return;
+    }
+
+    // Llenar el selector de tiendas
+    fillStoreSelect();
+    storeSelectorSection.style.display = "block";
+
+    loginStatus.textContent = `Sesión iniciada como ${currentUser}.`;
+    loginStatus.style.color = "green";
+
+    // Cargar datos de la primera tienda
+    currentStoreId = currentStores[0].id;
+    loadSensors();
+  } catch (err) {
+    console.error(err);
+    loginStatus.textContent = err.message || "No se pudo iniciar sesión.";
+    loginStatus.style.color = "red";
+  }
+}
+
+function fillStoreSelect() {
+  storeSelect.innerHTML = "";
+  currentStores.forEach((store) => {
+    const opt = document.createElement("option");
+    opt.value = store.id;
+    opt.textContent = store.name || store.id;
+    storeSelect.appendChild(opt);
+  });
+
+  if (currentStores.length > 0) {
+    currentStoreId = currentStores[0].id;
+    storeSelect.value = currentStoreId;
+  }
+}
+
+// Cambiar tienda seleccionada
+storeSelect.addEventListener("change", () => {
+  currentStoreId = storeSelect.value;
+  loadSensors();
+});
+
+// Click en login
+loginBtn.addEventListener("click", login);
 
 // -------- CONTADOR TIENDA (ENTRADAS / SALIDAS) --------
 
 async function loadSensors() {
+  if (!currentStoreId) {
+    sensorsContainer.innerHTML =
+      "<p>Inicia sesión y selecciona una tienda para ver los datos.</p>";
+    return;
+  }
+
   try {
     sensorsContainer.innerHTML = "<p>Cargando datos de la tienda...</p>";
 
-    const res = await fetch(COUNTERS_URL);
+    const url = `${COUNTERS_URL}?storeId=${encodeURIComponent(currentStoreId)}`;
+    const res = await fetch(url);
     if (!res.ok) {
       throw new Error("Error al obtener los contadores: " + res.status);
     }
@@ -39,7 +140,7 @@ function renderStoreCounters(counters) {
     return;
   }
 
-  const { entradas = 0, salidas = 0, dentro = 0 } = counters;
+  const { storeId, entradas = 0, salidas = 0, dentro = 0 } = counters;
 
   sensorsContainer.innerHTML = "";
 
@@ -48,9 +149,16 @@ function renderStoreCounters(counters) {
 
   const nowStr = new Date().toLocaleTimeString();
 
+  // Buscar nombre bonito de la tienda
+  let storeName = storeId;
+  const found = currentStores.find((s) => s.id === storeId);
+  if (found && found.name) {
+    storeName = found.name;
+  }
+
   card.innerHTML = `
     <div class="sensor-header">
-      <div class="sensor-id">Tienda comercial</div>
+      <div class="sensor-id">${storeName}</div>
       <div class="sensor-type">Contador de personas</div>
     </div>
 
@@ -100,8 +208,6 @@ refreshSelect.addEventListener("change", () => {
   }
 });
 
-// Carga inicial
-loadSensors();
-
-
-
+// Carga inicial: mostrar mensaje de login
+sensorsContainer.innerHTML =
+  "<p>Ingresa un usuario (ej: <strong>dueno1</strong> o <strong>dueno2</strong>) y presiona Entrar.</p>";
