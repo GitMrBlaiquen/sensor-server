@@ -223,4 +223,3 @@ refreshSelect.addEventListener("change", () => {
 // Mensaje inicial
 sensorsContainer.innerHTML =
   "<p>Inicia sesión para ver el contador de personas.</p>";
-
