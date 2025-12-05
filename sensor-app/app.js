@@ -18,6 +18,10 @@ const passwordInput = document.getElementById("passwordInput");
 const loginBtn = document.getElementById("loginBtn");
 const loginStatus = document.getElementById("loginStatus");
 
+// (Opcional) info de usuario y logout, por si lo tienes en el HTML
+const userInfo = document.getElementById("userInfo");
+const logoutBtn = document.getElementById("logoutBtn");
+
 // Selector de tienda
 const storeSelectorSection = document.getElementById("storeSelectorSection");
 const storeSelect = document.getElementById("storeSelect");
@@ -26,6 +30,7 @@ let autoRefreshId = null;
 
 // Estado actual
 let currentUser = null;
+let currentRole = null;   // 👈 aquí guardamos admin / dueño
 let currentStores = [];
 let currentStoreId = null;
 
@@ -62,6 +67,7 @@ async function login() {
 
     const data = await res.json();
     currentUser = data.username;
+    currentRole = data.role || "dueño";  // 👈 por si acaso no viniera
     currentStores = data.stores || [];
 
     if (currentStores.length === 0) {
@@ -74,10 +80,25 @@ async function login() {
     fillStoreSelect();
     storeSelectorSection.style.display = "block";
 
+    // Mensaje en consola para depurar
+    console.log(`Sesión iniciada como ${currentUser} (${currentRole})`);
+
+    // Si existe un elemento userInfo en el DOM, mostramos icono + rol
+    if (userInfo) {
+      const roleLabel = currentRole === "admin" ? "Administrador" : "Dueño";
+      userInfo.innerHTML = `
+        <span class="user-icon">👤</span>
+        <span class="user-name">${currentUser}</span>
+        <span class="user-role">(${roleLabel})</span>
+      `;
+    }
+
+    // Limpiar mensaje de login
     loginStatus.textContent = "";
+
     // Ocultar login y mostrar panel principal
-    loginPanel.style.display = "none";
-    mainContent.style.display = "block";
+    if (loginPanel) loginPanel.style.display = "none";
+    if (mainContent) mainContent.style.display = "block";
 
     // Cargar la primera tienda
     currentStoreId = currentStores[0].id;
@@ -120,6 +141,35 @@ usernameInput.addEventListener("keydown", (e) => {
 passwordInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") login();
 });
+
+// -------- LOGOUT (opcional, si tienes un botón) --------
+
+function logout() {
+  if (autoRefreshId) {
+    clearInterval(autoRefreshId);
+    autoRefreshId = null;
+  }
+
+  currentUser = null;
+  currentRole = null;
+  currentStores = [];
+  currentStoreId = null;
+
+  if (userInfo) userInfo.textContent = "";
+  storeSelect.innerHTML = "";
+  sensorsContainer.innerHTML =
+    "<p>Inicia sesión para ver el contador de personas.</p>";
+  loginStatus.textContent = "";
+  usernameInput.value = "";
+  passwordInput.value = "";
+
+  if (mainContent) mainContent.style.display = "none";
+  if (loginPanel) loginPanel.style.display = "block";
+}
+
+if (logoutBtn) {
+  logoutBtn.addEventListener("click", logout);
+}
 
 // -------- CONTADOR TIENDA (ENTRADAS / SALIDAS) --------
 
