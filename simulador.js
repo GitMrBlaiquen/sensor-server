@@ -1,16 +1,11 @@
 const axios = require("axios");
 
-// 🔹 URL del backend (Render):
+// URL del backend
 const API_URL = "https://sensor-server-54ak.onrender.com/api/sensors/data";
-// Para local:
-// const API_URL = "http://localhost:10000/api/sensors/data";
 
-// -------------------------------------------------------------
-// SENSORES POR TIENDA (entrada/salida)
-// -------------------------------------------------------------
-
+// Sensores de todas las tiendas
 const sensors = [
-  // ---------------- Arrow (3 tiendas) ----------------
+  // Arrow
   { storeId: "arrow-01", deviceId: "arrow01-entrada", type: "entrada" },
   { storeId: "arrow-01", deviceId: "arrow01-salida", type: "salida" },
 
@@ -20,7 +15,7 @@ const sensors = [
   { storeId: "arrow-03", deviceId: "arrow03-entrada", type: "entrada" },
   { storeId: "arrow-03", deviceId: "arrow03-salida", type: "salida" },
 
-  // ---------------- Leoniza (4 tiendas) ----------------
+  // Leoniza
   { storeId: "leoniza-01", deviceId: "leoniza01-entrada", type: "entrada" },
   { storeId: "leoniza-01", deviceId: "leoniza01-salida", type: "salida" },
 
@@ -34,20 +29,14 @@ const sensors = [
   { storeId: "leoniza-04", deviceId: "leoniza04-salida", type: "salida" },
 ];
 
-// -------------------------------------------------------------
-// FUNCIONES
-// -------------------------------------------------------------
-
 function randomInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
 async function sendRandomData() {
   for (const s of sensors) {
-    // Personas que entran/salen en este intervalo
-    const value = randomInt(0, 6); // entre 0 y 6 personas cada ciclo
-
-    if (value === 0) continue; // a veces nadie entra/sale
+    const value = randomInt(0, 5);
+    if (value === 0) continue;
 
     const body = {
       storeId: s.storeId,
@@ -59,15 +48,15 @@ async function sendRandomData() {
 
     try {
       const res = await axios.post(API_URL, body);
-      console.log("Enviado:", body, "→ respuesta:", res.status);
+      console.log("✔️ Enviado:", body);
     } catch (err) {
-      console.error("Error enviando datos:", err.message);
+      console.error("❌ Error:", err.message);
     }
   }
 }
 
-// Enviar una vez al arrancar
-sendRandomData();
+// Esperar 3 segundos para evitar que Render ignore la primera llamada
+setTimeout(sendRandomData, 3000);
 
-// Enviar datos cada 5 segundos
+// Luego cada 5s
 setInterval(sendRandomData, 5000);
