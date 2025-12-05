@@ -123,8 +123,8 @@ footer {
 }
 
 .logo {
-  height: 50px;
-  margin-right: 12px;
+  height: 130px;       
+  margin-bottom: 10px;
 }
 
 /* ───────────── Login Panel ───────────── */
@@ -191,3 +191,4 @@ footer {
 .store-selector label select {
   margin-left: 4px;
 }
+
