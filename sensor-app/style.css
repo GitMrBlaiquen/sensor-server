@@ -1,38 +1,88 @@
-/* Usuario conectado (icono + nombre + rol) */
-.toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: center;
-  margin-bottom: 16px;
-}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Panel de Contador de Personas - Tiendas</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <img src="logo.png" alt="logo" class="logo">
+    <h1>Panel de personas en tiendas comerciales</h1>
+    <p>Contador en tiempo real de entradas y salidas por tienda.</p>
+  </header>
 
-.toolbar-left {
-  display: flex;
-  align-items: center;
-}
+  <!-- PANEL DE LOGIN (pantalla inicial) -->
+  <section class="login-panel" id="loginPanel">
+    <h2>Iniciar sesión</h2>
 
-.user-icon {
-  margin-right: 6px;
-  font-size: 18px;
-}
+    <div class="login-card">
+      <div class="input-group">
+        <span class="input-icon">👤</span>
+        <input
+          id="usernameInput"
+          type="text"
+          placeholder="Usuario (Vicente, Rodrigo, Leoniza, Arrow)"
+        />
+      </div>
 
-.user-name {
-  font-weight: 600;
-}
+      <div class="input-group">
+        <span class="input-icon">🔒</span>
+        <input
+          id="passwordInput"
+          type="password"
+          placeholder="Contraseña"
+        />
+      </div>
 
-.user-role {
-  margin-left: 4px;
-  font-size: 0.9rem;
-  opacity: 0.8;
-}
+      <button id="loginBtn">Entrar</button>
+      <div id="loginStatus" class="login-status"></div>
+    </div>
+  </section>
 
-.logout-btn {
-  background: #c0392b;
-  box-shadow: 0 4px 10px rgba(192, 57, 43, 0.5);
-}
+  <!-- CONTENIDO PRINCIPAL (se muestra SOLO tras login) -->
+  <main id="mainContent" style="display: none;">
 
-.logout-btn:hover {
-  background: #e74c3c;
-}
+    <!-- Barra superior: usuario + logout -->
+    <section class="toolbar">
+      <div class="toolbar-left">
+        <span id="userInfo"></span>
+      </div>
+
+      <div class="toolbar-right">
+        <button id="refreshBtn">Actualizar ahora</button>
+        <label>
+          Auto-actualizar cada
+          <select id="refreshInterval">
+            <option value="0">No auto</option>
+            <option value="5000">5 s</option>
+            <option value="10000" selected>10 s</option>
+            <option value="30000">30 s</option>
+          </select>
+        </label>
+        <button id="logoutBtn" class="logout-btn">Cerrar sesión</button>
+      </div>
+    </section>
+
+    <!-- Selector de tienda -->
+    <section class="store-selector" id="storeSelectorSection">
+      <h2>Seleccionar tienda</h2>
+      <label>
+        Tienda:
+        <select id="storeSelect"></select>
+      </label>
+    </section>
+
+    <!-- Panel principal: contador de personas -->
+    <section id="sensorsContainer">
+      <!-- Aquí se mostrará el resumen de entradas / salidas / dentro -->
+    </section>
+  </main>
+
+  <footer>
+    <small>Proyecto creado por Vicente Becerra – Contador de Personas para Tiendas Comerciales</small>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
