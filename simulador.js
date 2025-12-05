@@ -1,14 +1,18 @@
 const axios = require("axios");
 
 // 🔹 URL del backend:
-// Recordar usar la de Render o la local
-// const API_URL = "http://localhost:10000/api/sensors/data";
+// Para local: const API_URL = "http://localhost:10000/api/sensors/data";
 const API_URL = "https://sensor-server-54ak.onrender.com/api/sensors/data";
 
-// Sensores: puerta de entrada y puerta de salida de la tienda
+// Sensores: puertas de entrada y salida de cada tienda
 const sensors = [
-  { deviceId: "puerta-entrada", type: "entrada" },
-  { deviceId: "puerta-salida", type: "salida" },
+  // Tienda 1
+  { storeId: "tienda-1", deviceId: "t1-puerta-entrada", type: "entrada" },
+  { storeId: "tienda-1", deviceId: "t1-puerta-salida", type: "salida" },
+
+  // Tienda 2
+  { storeId: "tienda-2", deviceId: "t2-puerta-entrada", type: "entrada" },
+  { storeId: "tienda-2", deviceId: "t2-puerta-salida", type: "salida" },
 ];
 
 function randomInt(min, max) {
@@ -18,11 +22,12 @@ function randomInt(min, max) {
 async function sendRandomData() {
   for (const s of sensors) {
     // Personas que entran/salen en este intervalo
-    const value = randomInt(0, 5); // entre 0 y 5 personas cada 5 segundos
+    const value = randomInt(0, 5); // entre 0 y 5 personas cada ciclo
 
     if (value === 0) continue; // a veces nadie entra/sale
 
     const body = {
+      storeId: s.storeId,
       deviceId: s.deviceId,
       type: s.type,  // "entrada" o "salida"
       value,         // cuántas personas
@@ -43,5 +48,3 @@ sendRandomData();
 
 // Enviar datos cada 5 segundos
 setInterval(sendRandomData, 5000);
-
-
