@@ -53,7 +53,7 @@ const users = {
   Arrow: {
     username: "Arrow",
     password: "Arrow57105",
-    role: "dueno",
+    role: "dueño",
     stores: ["arrow-01", "arrow-02", "arrow-03"],
   },
 
@@ -61,7 +61,7 @@ const users = {
   Leoniza: {
     username: "Leoniza",
     password: "Leoniza99481",
-    role: "dueno",
+    role: "dueño",
     stores: ["leoniza-01", "leoniza-02", "leoniza-03", "leoniza-04"],
   },
 };
@@ -71,8 +71,8 @@ const users = {
 // --------------------------------------------------------------
 
 // POST /api/login
-// Body: { username: "dueno1", password: "1234" }
-// Respuesta: { username, stores: [ {id, name}, ... ] }
+// Body: { username: "Vicente", password: "Admin09867" }
+// Respuesta: { username, role, stores: [ {id, name}, ... ] }
 app.post("/api/login", (req, res) => {
   const { username, password } = req.body;
 
@@ -91,6 +91,7 @@ app.post("/api/login", (req, res) => {
 
   return res.json({
     username: user.username,
+    role: user.role,   // 👈 devolvemos el rol (admin / dueño)
     stores: userStores,
   });
 });
@@ -103,7 +104,7 @@ app.post("/api/login", (req, res) => {
 const sensors = {};
 
 // Contadores por tienda:
-// storeCounters["tienda-1"] = { entradas: X, salidas: Y }
+// storeCounters["arrow-01"] = { entradas: X, salidas: Y }
 const storeCounters = {};
 
 function ensureStore(storeId) {
@@ -115,8 +116,8 @@ function ensureStore(storeId) {
 // POST /api/sensors/data
 // Espera algo como:
 // {
-//   storeId: "tienda-1",
-//   deviceId: "t1-puerta-entrada",
+//   storeId: "arrow-01",
+//   deviceId: "puerta-entrada",
 //   type: "entrada" | "salida",
 //   value: 1,
 //   unit: "personas"
@@ -163,7 +164,7 @@ app.post("/api/sensors/data", (req, res) => {
   res.json({ status: "ok" });
 });
 
-// GET /api/store/counters?storeId=tienda-1
+// GET /api/store/counters?storeId=arrow-01
 // Devuelve contadores de UNA tienda
 app.get("/api/store/counters", (req, res) => {
   const { storeId } = req.query;
@@ -202,5 +203,3 @@ const PORT = process.env.PORT || 10000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Servidor TIENDAS activo en el puerto ${PORT}`);
 });
-
-
