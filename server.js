@@ -26,13 +26,16 @@ const stores = {
 };
 
 // Usuarios de ejemplo (2 dueños, cada uno con su tienda)
+// Contraseñas DEMO
 const users = {
   dueno1: {
     username: "dueno1",
+    password: "1234",
     stores: ["tienda-1"],
   },
   dueno2: {
     username: "dueno2",
+    password: "5678",
     stores: ["tienda-2"],
   },
 };
@@ -42,21 +45,20 @@ const users = {
 // --------------------------------------------------------------
 
 // POST /api/login
-// Body: { username: "dueno1" }
+// Body: { username: "dueno1", password: "1234" }
 // Respuesta: { username, stores: [ {id, name}, ... ] }
 app.post("/api/login", (req, res) => {
-  const { username } = req.body;
+  const { username, password } = req.body;
 
-  if (!username) {
-    return res.status(400).json({ error: "Falta username" });
+  if (!username || !password) {
+    return res.status(400).json({ error: "Faltan username o password" });
   }
 
   const user = users[username];
-  if (!user) {
-    return res.status(401).json({ error: "Usuario no encontrado" });
+  if (!user || user.password !== password) {
+    return res.status(401).json({ error: "Usuario o contraseña inválidos" });
   }
 
-  // Mapear IDs de tiendas a objetos con id y name
   const userStores = user.stores
     .map((storeId) => stores[storeId])
     .filter(Boolean);
@@ -78,7 +80,6 @@ const sensors = {};
 // storeCounters["tienda-1"] = { entradas: X, salidas: Y }
 const storeCounters = {};
 
-// Asegurar que exista el objeto de una tienda
 function ensureStore(storeId) {
   if (!storeCounters[storeId]) {
     storeCounters[storeId] = { entradas: 0, salidas: 0 };
