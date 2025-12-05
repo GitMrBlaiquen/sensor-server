@@ -1,214 +1,225 @@
-const express = require("express");
-const cors = require("cors");
-const path = require("path");
+// URL base de la API
+const BASE_URL = window.location.origin;
+// Para pruebas locales, puedes usar:
+// const BASE_URL = "http://localhost:10000";
 
-const app = express();
+const LOGIN_URL = `${BASE_URL}/api/login`;
+const COUNTERS_URL = `${BASE_URL}/api/store/counters`;
 
-// --- Middlewares ---
-app.use(cors());
-app.use(express.json());
+const sensorsContainer = document.getElementById("sensorsContainer");
+const refreshBtn = document.getElementById("refreshBtn");
+const refreshSelect = document.getElementById("refreshInterval");
 
-// --- Servir el frontend (sensor-app) ---
-app.use(express.static(path.join(__dirname, "sensor-app")));
+// Login
+const loginPanel = document.getElementById("loginPanel");
+const mainContent = document.getElementById("mainContent");
+const usernameInput = document.getElementById("usernameInput");
+const passwordInput = document.getElementById("passwordInput");
+const loginBtn = document.getElementById("loginBtn");
+const loginStatus = document.getElementById("loginStatus");
 
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "sensor-app", "index.html"));
-});
+// Selector de tienda
+const storeSelectorSection = document.getElementById("storeSelectorSection");
+const storeSelect = document.getElementById("storeSelect");
 
-// --------------------------------------------------------------
-// ---------   MODELO EN MEMORIA: USUARIOS Y TIENDAS   ----------
-// --------------------------------------------------------------
+let autoRefreshId = null;
 
-// Tiendas disponibles
-const stores = {
-  // Tiendas de Arrow
-  "arrow-01": { id: "arrow-01", name: "Tienda Arrow 01" },
-  "arrow-02": { id: "arrow-02", name: "Tienda Arrow 02" },
-  "arrow-03": { id: "arrow-03", name: "Tienda Arrow 03" },
+// Estado actual
+let currentUser = null;
+let currentStores = [];
+let currentStoreId = null;
 
-  // Tiendas de Leoniza
-  "leoniza-01": { id: "leoniza-01", name: "Tienda Leoniza 01" },
-  "leoniza-02": { id: "leoniza-02", name: "Tienda Leoniza 02" },
-  "leoniza-03": { id: "leoniza-03", name: "Tienda Leoniza 03" },
-  "leoniza-04": { id: "leoniza-04", name: "Tienda Leoniza 04" },
-};
+// -------- LOGIN --------
 
-// Usuarios de ejemplo (2 dueños, cada uno con su tienda)
-// Contraseñas DEMO
-const users = {
-  dueno1: {
-    username: "dueno1",
-    password: "1234",
-    stores: ["tienda-1"],
-  },
-  dueno2: {
-    username: "dueno2",
-    password: "5678",
-    stores: ["tienda-2"],
-  },
-};// Usuarios del sistema
-const users = {
-  // Administradores: ven TODAS las tiendas
-  Vicente: {
-    username: "Vicente",
-    password: "Admin09867",
-    stores: Object.keys(stores), // todas las tiendas
-  },
-  Rodrigo: {
-    username: "Rodrigo",
-    password: "Admin170817",
-    stores: Object.keys(stores), // todas las tiendas
-  },
-
-  // Arrow: solo sus 3 tiendas
-  Arrow: {
-    username: "Arrow",
-    password: "Arrow57105",
-    stores: ["arrow-01", "arrow-02", "arrow-03"],
-  },
-
-  // Leoniza: sus 4 tiendas
-  Leoniza: {
-    username: "Leoniza",
-    password: "Leoniza99481",
-    stores: ["leoniza-01", "leoniza-02", "leoniza-03", "leoniza-04"],
-  },
-};
-
-// --------------------------------------------------------------
-// ---------------------   LOGIN DE USUARIOS   ------------------
-// --------------------------------------------------------------
-
-// POST /api/login
-// Body: { username: "dueno1", password: "1234" }
-// Respuesta: { username, stores: [ {id, name}, ... ] }
-app.post("/api/login", (req, res) => {
-  const { username, password } = req.body;
+async function login() {
+  const username = usernameInput.value.trim();
+  const password = passwordInput.value.trim();
 
   if (!username || !password) {
-    return res.status(400).json({ error: "Faltan username o password" });
+    loginStatus.textContent = "Ingresa usuario y contraseña.";
+    loginStatus.style.color = "red";
+    return;
   }
 
-  const user = users[username];
-  if (!user || user.password !== password) {
-    return res.status(401).json({ error: "Usuario o contraseña inválidos" });
-  }
+  try {
+    loginStatus.textContent = "Ingresando...";
+    loginStatus.style.color = "inherit";
 
-  const userStores = user.stores
-    .map((storeId) => stores[storeId])
-    .filter(Boolean);
+    const res = await fetch(LOGIN_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ username, password }),
+    });
 
-  return res.json({
-    username: user.username,
-    stores: userStores,
-  });
-});
+    if (!res.ok) {
+      if (res.status === 401) {
+        throw new Error("Usuario o contraseña incorrectos.");
+      }
+      throw new Error("Error en el login.");
+    }
 
-// --------------------------------------------------------------
-// -----------   CONTADOR DE PERSONAS POR TIENDA   --------------
-// --------------------------------------------------------------
+    const data = await res.json();
+    currentUser = data.username;
+    currentStores = data.stores || [];
 
-// Último dato por sensor (para debug)
-const sensors = {};
+    if (currentStores.length === 0) {
+      loginStatus.textContent = "El usuario no tiene tiendas asignadas.";
+      loginStatus.style.color = "red";
+      return;
+    }
 
-// Contadores por tienda:
-// storeCounters["tienda-1"] = { entradas: X, salidas: Y }
-const storeCounters = {};
+    // Llenar el selector de tiendas
+    fillStoreSelect();
+    storeSelectorSection.style.display = "block";
 
-function ensureStore(storeId) {
-  if (!storeCounters[storeId]) {
-    storeCounters[storeId] = { entradas: 0, salidas: 0 };
+    loginStatus.textContent = "";
+    // Ocultar login y mostrar panel principal
+    loginPanel.style.display = "none";
+    mainContent.style.display = "block";
+
+    // Cargar la primera tienda
+    currentStoreId = currentStores[0].id;
+    loadSensors();
+  } catch (err) {
+    console.error(err);
+    loginStatus.textContent = err.message || "No se pudo iniciar sesión.";
+    loginStatus.style.color = "red";
   }
 }
 
-// POST /api/sensors/data
-// Espera algo como:
-// {
-//   storeId: "tienda-1",
-//   deviceId: "t1-puerta-entrada",
-//   type: "entrada" | "salida",
-//   value: 1,
-//   unit: "personas"
-// }
-app.post("/api/sensors/data", (req, res) => {
-  const { storeId, deviceId, type, value, unit, extra } = req.body;
-
-  if (!storeId) {
-    return res.status(400).json({ error: "Falta storeId" });
-  }
-  if (!deviceId) {
-    return res.status(400).json({ error: "Falta deviceId" });
-  }
-
-  const now = new Date();
-  const numericValue = value !== undefined ? Number(value) : 1;
-  const safeValue = isNaN(numericValue) ? 1 : numericValue;
-
-  // Guardar último dato del sensor
-  const sensorKey = `${storeId}:${deviceId}`;
-  sensors[sensorKey] = {
-    storeId,
-    deviceId,
-    type: type || "desconocido",
-    value: safeValue,
-    unit: unit || "",
-    extra: extra || {},
-    lastUpdate: now,
-  };
-
-  // Actualizar contadores de la tienda
-  ensureStore(storeId);
-  if (type === "entrada") {
-    storeCounters[storeId].entradas += safeValue;
-  } else if (type === "salida") {
-    storeCounters[storeId].salidas += safeValue;
-  }
-
-  console.log("Dato recibido:", sensors[sensorKey]);
-  console.log(
-    `Tienda ${storeId} -> Entradas: ${storeCounters[storeId].entradas}, Salidas: ${storeCounters[storeId].salidas}`
-  );
-
-  res.json({ status: "ok" });
-});
-
-// GET /api/store/counters?storeId=tienda-1
-// Devuelve contadores de UNA tienda
-app.get("/api/store/counters", (req, res) => {
-  const { storeId } = req.query;
-
-  if (!storeId) {
-    return res.status(400).json({ error: "Falta storeId en la query" });
-  }
-
-  ensureStore(storeId);
-  const { entradas, salidas } = storeCounters[storeId];
-  const dentro = Math.max(entradas - salidas, 0);
-
-  res.json({
-    storeId,
-    entradas,
-    salidas,
-    dentro,
+function fillStoreSelect() {
+  storeSelect.innerHTML = "";
+  currentStores.forEach((store) => {
+    const opt = document.createElement("option");
+    opt.value = store.id;
+    opt.textContent = store.name || store.id;
+    storeSelect.appendChild(opt);
   });
+
+  if (currentStores.length > 0) {
+    currentStoreId = currentStores[0].id;
+    storeSelect.value = currentStoreId;
+  }
+}
+
+// Cambiar tienda seleccionada
+storeSelect.addEventListener("change", () => {
+  currentStoreId = storeSelect.value;
+  loadSensors();
 });
 
-// (Opcional) lista de todas las tiendas
-app.get("/api/stores", (req, res) => {
-  res.json(Object.values(stores));
+// Click en login
+loginBtn.addEventListener("click", login);
+
+// Enter en inputs
+usernameInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") login();
+});
+passwordInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") login();
 });
 
-// (Opcional) debug de sensores
-app.get("/api/sensors", (req, res) => {
-  res.json(Object.values(sensors));
+// -------- CONTADOR TIENDA (ENTRADAS / SALIDAS) --------
+
+async function loadSensors() {
+  if (!currentStoreId) {
+    sensorsContainer.innerHTML =
+      "<p>Inicia sesión y selecciona una tienda para ver los datos.</p>";
+    return;
+  }
+
+  try {
+    sensorsContainer.innerHTML = "<p>Cargando datos de la tienda...</p>";
+
+    const url = `${COUNTERS_URL}?storeId=${encodeURIComponent(currentStoreId)}`;
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new Error("Error al obtener los contadores: " + res.status);
+    }
+
+    const data = await res.json();
+    renderStoreCounters(data);
+  } catch (err) {
+    console.error(err);
+    sensorsContainer.innerHTML =
+      `<p style="color:red;">No se pudieron cargar los datos de la tienda. Revisa el servidor.</p>`;
+  }
+}
+
+function renderStoreCounters(counters) {
+  if (!counters) {
+    sensorsContainer.innerHTML = "<p>No hay datos disponibles aún.</p>";
+    return;
+  }
+
+  const { storeId, entradas = 0, salidas = 0, dentro = 0 } = counters;
+
+  sensorsContainer.innerHTML = "";
+
+  const card = document.createElement("article");
+  card.className = "sensor-card";
+
+  const nowStr = new Date().toLocaleTimeString();
+
+  // Nombre de tienda
+  let storeName = storeId;
+  const found = currentStores.find((s) => s.id === storeId);
+  if (found && found.name) storeName = found.name;
+
+  card.innerHTML = `
+    <div class="sensor-header">
+      <div class="sensor-id">${storeName}</div>
+      <div class="sensor-type">Contador de personas</div>
+    </div>
+
+    <div class="store-counters">
+      <div class="store-counter-item">
+        <span class="label">Personas que han ENTRADO</span>
+        <span class="value">${entradas}</span>
+      </div>
+      <div class="store-counter-item">
+        <span class="label">Personas que han SALIDO</span>
+        <span class="value">${salidas}</span>
+      </div>
+      <div class="store-counter-item">
+        <span class="label">Personas DENTRO de la tienda</span>
+        <span class="value">${dentro}</span>
+      </div>
+    </div>
+
+    <div class="sensor-meta">
+      Última actualización: ${nowStr}
+    </div>
+  `;
+
+  sensorsContainer.appendChild(card);
+}
+
+// -------- CONTROLES GENERALES --------
+
+// Botón de refresco manual
+refreshBtn.addEventListener("click", () => {
+  loadSensors();
 });
 
-// --------------------------------------------------------------
-// ---------------------   INICIO DEL SERVER   ------------------
-// --------------------------------------------------------------
+// Auto-actualización
+refreshSelect.addEventListener("change", () => {
+  const interval = Number(refreshSelect.value);
 
-const PORT = process.env.PORT || 10000;
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Servidor TIENDAS activo en el puerto ${PORT}`);
+  if (autoRefreshId) {
+    clearInterval(autoRefreshId);
+    autoRefreshId = null;
+  }
+
+  if (interval > 0) {
+    autoRefreshId = setInterval(() => {
+      loadSensors();
+    }, interval);
+  }
 });
 
+// Mensaje inicial
+sensorsContainer.innerHTML =
+  "<p>Inicia sesión para ver el contador de personas.</p>";
