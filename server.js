@@ -11,19 +11,25 @@ app.use(express.json());
 // --- Servir el frontend (sensor-app) ---
 app.use(express.static(path.join(__dirname, "sensor-app")));
 
-// Cuando el usuario entra a la raíz "/", se envia index.html
+// Cuando el usuario entra a la raíz "/", se envía index.html
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "sensor-app", "index.html"));
 });
 
 // --------------------------------------------------------------
-// ----------------------   API SENSORES   ----------------------
+// -----------   CONTADOR DE PERSONAS EN TIENDA   ---------------
 // --------------------------------------------------------------
 
-// Estado en memoria: último dato por sensor
+// Estado en memoria: último dato por sensor (puertas, etc.)
 const sensors = {};
 
+// Contadores globales para la tienda
+let totalEntradas = 0;
+let totalSalidas = 0;
+
 // POST /api/sensors/data
+// Espera algo como:
+// { deviceId: "puerta-entrada", type: "entrada" | "salida", value: 1, unit: "personas" }
 app.post("/api/sensors/data", (req, res) => {
   const { deviceId, type, value, unit, extra } = req.body;
 
@@ -32,69 +38,53 @@ app.post("/api/sensors/data", (req, res) => {
   }
 
   const now = new Date();
+  const numericValue = value !== undefined ? Number(value) : 1;
+  const safeValue = isNaN(numericValue) ? 1 : numericValue;
 
+  // Guardar último dato del sensor
   sensors[deviceId] = {
     deviceId,
     type: type || "desconocido",
-    value: value !== undefined ? value : null,
+    value: safeValue,
     unit: unit || "",
     extra: extra || {},
     lastUpdate: now,
   };
 
+  // Actualizar contadores globales según el tipo
+  if (type === "entrada") {
+    totalEntradas += safeValue;
+  } else if (type === "salida") {
+    totalSalidas += safeValue;
+  }
+
   console.log("Dato recibido:", sensors[deviceId]);
+  console.log(
+    "Totales tienda -> Entradas:",
+    totalEntradas,
+    "Salidas:",
+    totalSalidas
+  );
 
   res.json({ status: "ok" });
 });
 
-// --------------------------------------------------------------
-// ------------------------    ALERTAS    ------------------------
-// --------------------------------------------------------------
-
-// Lista de alertas en memoria
-let nextAlertId = 1;
-const alerts = [];
-
-// POST /api/alerts -> registrar nueva alerta
-app.post("/api/alerts", (req, res) => {
-  let { type, message, source, busId } = req.body;
-
-  if (!type) type = "otro";
-  if (!message) message = "";
-  if (!busId) {
-    return res.status(400).json({ error: "Falta busId en la alerta" });
-  }
-
-  const alert = {
-    id: nextAlertId++,
-    type,
-    message,
-    busId,
-    source: source || "app",
-    timestamp: new Date(),
-  };
-
-  // Insertar al principio
-  alerts.unshift(alert);
-
-  // Limitar a 50 alertas
-  if (alerts.length > 50) alerts.pop();
-
-  console.log("Alerta recibida:", alert);
-
-  res.json({ status: "ok", alert });
-});
-
-// GET /api/alerts -> lista de alertas recientes
-app.get("/api/alerts", (req, res) => {
-  res.json(alerts);
+// GET /api/store/counters
+// Devuelve resumen para el panel: entradas, salidas y personas dentro
+app.get("/api/store/counters", (req, res) => {
+  const dentro = Math.max(totalEntradas - totalSalidas, 0);
+  res.json({
+    entradas: totalEntradas,
+    salidas: totalSalidas,
+    dentro,
+  });
 });
 
 // --------------------------------------------------------------
-// ------------------------    SENSORES   ------------------------
+// ---------   RUTA OPCIONAL: listar sensores (debug)   ---------
 // --------------------------------------------------------------
 
-// GET /api/sensors -> lista completa
+// GET /api/sensors -> lista completa de últimos datos por sensor
 app.get("/api/sensors", (req, res) => {
   const list = Object.values(sensors).map((s) => ({
     ...s,
@@ -103,20 +93,13 @@ app.get("/api/sensors", (req, res) => {
   res.json(list);
 });
 
-// GET /api/sensors/:id -> sensor individual
-app.get("/api/sensors/:id", (req, res) => {
-  const sensor = sensors[req.params.id];
-  if (!sensor) return res.status(404).json({ error: "Sensor no encontrado" });
-  res.json(sensor);
-});
-
 // --------------------------------------------------------------
 // ---------------------   INICIO DEL SERVER   ------------------
 // --------------------------------------------------------------
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Servidor activo en Render en el puerto ${PORT}`);
+  console.log(`Servidor TIENDA activo en el puerto ${PORT}`);
 });
 
 
