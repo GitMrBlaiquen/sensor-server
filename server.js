@@ -11,28 +11,95 @@ app.use(express.json());
 // --- Servir el frontend (sensor-app) ---
 app.use(express.static(path.join(__dirname, "sensor-app")));
 
-// Cuando el usuario entra a la raíz "/", se envía index.html
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "sensor-app", "index.html"));
 });
 
 // --------------------------------------------------------------
-// -----------   CONTADOR DE PERSONAS EN TIENDA   ---------------
+// ---------   MODELO EN MEMORIA: USUARIOS Y TIENDAS   ----------
 // --------------------------------------------------------------
 
-// Estado en memoria: último dato por sensor (puertas, etc.)
+// Tiendas disponibles
+const stores = {
+  "tienda-1": { id: "tienda-1", name: "Tienda 1 - Centro" },
+  "tienda-2": { id: "tienda-2", name: "Tienda 2 - Mall" },
+};
+
+// Usuarios de ejemplo (2 dueños, cada uno con su tienda)
+const users = {
+  dueno1: {
+    username: "dueno1",
+    stores: ["tienda-1"],
+  },
+  dueno2: {
+    username: "dueno2",
+    stores: ["tienda-2"],
+  },
+};
+
+// --------------------------------------------------------------
+// ---------------------   LOGIN DE USUARIOS   ------------------
+// --------------------------------------------------------------
+
+// POST /api/login
+// Body: { username: "dueno1" }
+// Respuesta: { username, stores: [ {id, name}, ... ] }
+app.post("/api/login", (req, res) => {
+  const { username } = req.body;
+
+  if (!username) {
+    return res.status(400).json({ error: "Falta username" });
+  }
+
+  const user = users[username];
+  if (!user) {
+    return res.status(401).json({ error: "Usuario no encontrado" });
+  }
+
+  // Mapear IDs de tiendas a objetos con id y name
+  const userStores = user.stores
+    .map((storeId) => stores[storeId])
+    .filter(Boolean);
+
+  return res.json({
+    username: user.username,
+    stores: userStores,
+  });
+});
+
+// --------------------------------------------------------------
+// -----------   CONTADOR DE PERSONAS POR TIENDA   --------------
+// --------------------------------------------------------------
+
+// Último dato por sensor (para debug)
 const sensors = {};
 
-// Contadores globales para la tienda
-let totalEntradas = 0;
-let totalSalidas = 0;
+// Contadores por tienda:
+// storeCounters["tienda-1"] = { entradas: X, salidas: Y }
+const storeCounters = {};
+
+// Asegurar que exista el objeto de una tienda
+function ensureStore(storeId) {
+  if (!storeCounters[storeId]) {
+    storeCounters[storeId] = { entradas: 0, salidas: 0 };
+  }
+}
 
 // POST /api/sensors/data
 // Espera algo como:
-// { deviceId: "puerta-entrada", type: "entrada" | "salida", value: 1, unit: "personas" }
+// {
+//   storeId: "tienda-1",
+//   deviceId: "t1-puerta-entrada",
+//   type: "entrada" | "salida",
+//   value: 1,
+//   unit: "personas"
+// }
 app.post("/api/sensors/data", (req, res) => {
-  const { deviceId, type, value, unit, extra } = req.body;
+  const { storeId, deviceId, type, value, unit, extra } = req.body;
 
+  if (!storeId) {
+    return res.status(400).json({ error: "Falta storeId" });
+  }
   if (!deviceId) {
     return res.status(400).json({ error: "Falta deviceId" });
   }
@@ -42,7 +109,9 @@ app.post("/api/sensors/data", (req, res) => {
   const safeValue = isNaN(numericValue) ? 1 : numericValue;
 
   // Guardar último dato del sensor
-  sensors[deviceId] = {
+  const sensorKey = `${storeId}:${deviceId}`;
+  sensors[sensorKey] = {
+    storeId,
     deviceId,
     type: type || "desconocido",
     value: safeValue,
@@ -51,46 +120,51 @@ app.post("/api/sensors/data", (req, res) => {
     lastUpdate: now,
   };
 
-  // Actualizar contadores globales según el tipo
+  // Actualizar contadores de la tienda
+  ensureStore(storeId);
   if (type === "entrada") {
-    totalEntradas += safeValue;
+    storeCounters[storeId].entradas += safeValue;
   } else if (type === "salida") {
-    totalSalidas += safeValue;
+    storeCounters[storeId].salidas += safeValue;
   }
 
-  console.log("Dato recibido:", sensors[deviceId]);
+  console.log("Dato recibido:", sensors[sensorKey]);
   console.log(
-    "Totales tienda -> Entradas:",
-    totalEntradas,
-    "Salidas:",
-    totalSalidas
+    `Tienda ${storeId} -> Entradas: ${storeCounters[storeId].entradas}, Salidas: ${storeCounters[storeId].salidas}`
   );
 
   res.json({ status: "ok" });
 });
 
-// GET /api/store/counters
-// Devuelve resumen para el panel: entradas, salidas y personas dentro
+// GET /api/store/counters?storeId=tienda-1
+// Devuelve contadores de UNA tienda
 app.get("/api/store/counters", (req, res) => {
-  const dentro = Math.max(totalEntradas - totalSalidas, 0);
+  const { storeId } = req.query;
+
+  if (!storeId) {
+    return res.status(400).json({ error: "Falta storeId en la query" });
+  }
+
+  ensureStore(storeId);
+  const { entradas, salidas } = storeCounters[storeId];
+  const dentro = Math.max(entradas - salidas, 0);
+
   res.json({
-    entradas: totalEntradas,
-    salidas: totalSalidas,
+    storeId,
+    entradas,
+    salidas,
     dentro,
   });
 });
 
-// --------------------------------------------------------------
-// ---------   RUTA OPCIONAL: listar sensores (debug)   ---------
-// --------------------------------------------------------------
+// (Opcional) lista de todas las tiendas
+app.get("/api/stores", (req, res) => {
+  res.json(Object.values(stores));
+});
 
-// GET /api/sensors -> lista completa de últimos datos por sensor
+// (Opcional) debug de sensores
 app.get("/api/sensors", (req, res) => {
-  const list = Object.values(sensors).map((s) => ({
-    ...s,
-    lastUpdate: s.lastUpdate,
-  }));
-  res.json(list);
+  res.json(Object.values(sensors));
 });
 
 // --------------------------------------------------------------
@@ -99,8 +173,5 @@ app.get("/api/sensors", (req, res) => {
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Servidor TIENDA activo en el puerto ${PORT}`);
+  console.log(`Servidor TIENDAS activo en el puerto ${PORT}`);
 });
-
-
-
