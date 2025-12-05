@@ -2,17 +2,39 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>Panel de Contador de Personas - Tienda</title>
+  <title>Panel de Contador de Personas - Tiendas</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <header>
     <img src="logo.png" alt="logo" class="logo">
-    <h1>Panel de personas en tienda comercial</h1>
-    <p>Contador en tiempo real de entradas y salidas.</p>
+    <h1>Panel de personas en tiendas comerciales</h1>
+    <p>Contador en tiempo real de entradas y salidas por tienda.</p>
   </header>
 
   <main>
+    <!-- Panel de login -->
+    <section class="login-panel">
+      <h2>Iniciar sesión</h2>
+      <div class="login-controls">
+        <label>
+          Usuario:
+          <input id="usernameInput" type="text" placeholder="Ej: dueno1 o dueno2" />
+        </label>
+        <button id="loginBtn">Entrar</button>
+        <span id="loginStatus"></span>
+      </div>
+    </section>
+
+    <!-- Selector de tienda (solo se muestra tras login) -->
+    <section class="store-selector" id="storeSelectorSection" style="display: none;">
+      <h2>Seleccionar tienda</h2>
+      <label>
+        Tienda:
+        <select id="storeSelect"></select>
+      </label>
+    </section>
+
     <!-- Barra de control -->
     <section class="toolbar">
       <button id="refreshBtn">Actualizar ahora</button>
