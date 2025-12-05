@@ -22,7 +22,7 @@
         <input
           id="usernameInput"
           type="text"
-          placeholder="Usuario (ej: dueno1 o dueno2)"
+          placeholder="Usuario (Vicente, Rodrigo, Leoniza, Arrow)"
         />
       </div>
 
@@ -31,7 +31,7 @@
         <input
           id="passwordInput"
           type="password"
-          placeholder="Contraseña (ej: 1234 o 5678)"
+          placeholder="Contraseña"
         />
       </div>
 
@@ -42,6 +42,18 @@
 
   <!-- CONTENIDO PRINCIPAL (se muestra SOLO tras login) -->
   <main id="mainContent" style="display: none;">
+
+    <!-- Barra de usuario: icono + nombre + rol + logout -->
+    <section class="user-bar">
+      <div class="user-left">
+        <!-- Aquí app.js escribe: 👤 Vicente (Administrador) o 👤 Arrow (Dueño) -->
+        <span id="userInfo"></span>
+      </div>
+      <div class="user-right">
+        <button id="logoutBtn" class="logout-btn">Cerrar sesión</button>
+      </div>
+    </section>
+
     <!-- Selector de tienda -->
     <section class="store-selector" id="storeSelectorSection">
       <h2>Seleccionar tienda</h2>
