@@ -10,10 +10,15 @@ const sensorsContainer = document.getElementById("sensorsContainer");
 const refreshBtn = document.getElementById("refreshBtn");
 const refreshSelect = document.getElementById("refreshInterval");
 
+// Login
+const loginPanel = document.getElementById("loginPanel");
+const mainContent = document.getElementById("mainContent");
 const usernameInput = document.getElementById("usernameInput");
+const passwordInput = document.getElementById("passwordInput");
 const loginBtn = document.getElementById("loginBtn");
 const loginStatus = document.getElementById("loginStatus");
 
+// Selector de tienda
 const storeSelectorSection = document.getElementById("storeSelectorSection");
 const storeSelect = document.getElementById("storeSelect");
 
@@ -28,9 +33,10 @@ let currentStoreId = null;
 
 async function login() {
   const username = usernameInput.value.trim();
+  const password = passwordInput.value.trim();
 
-  if (!username) {
-    loginStatus.textContent = "Ingresa un usuario.";
+  if (!username || !password) {
+    loginStatus.textContent = "Ingresa usuario y contraseña.";
     loginStatus.style.color = "red";
     return;
   }
@@ -44,12 +50,12 @@ async function login() {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ username }),
+      body: JSON.stringify({ username, password }),
     });
 
     if (!res.ok) {
       if (res.status === 401) {
-        throw new Error("Usuario no encontrado. Prueba con dueno1 o dueno2.");
+        throw new Error("Usuario o contraseña incorrectos.");
       }
       throw new Error("Error en el login.");
     }
@@ -61,8 +67,6 @@ async function login() {
     if (currentStores.length === 0) {
       loginStatus.textContent = "El usuario no tiene tiendas asignadas.";
       loginStatus.style.color = "red";
-      storeSelectorSection.style.display = "none";
-      sensorsContainer.innerHTML = "<p>Este usuario no tiene tiendas para mostrar.</p>";
       return;
     }
 
@@ -70,10 +74,12 @@ async function login() {
     fillStoreSelect();
     storeSelectorSection.style.display = "block";
 
-    loginStatus.textContent = `Sesión iniciada como ${currentUser}.`;
-    loginStatus.style.color = "green";
+    loginStatus.textContent = "";
+    // Ocultar login y mostrar panel principal
+    loginPanel.style.display = "none";
+    mainContent.style.display = "block";
 
-    // Cargar datos de la primera tienda
+    // Cargar la primera tienda
     currentStoreId = currentStores[0].id;
     loadSensors();
   } catch (err) {
@@ -106,6 +112,14 @@ storeSelect.addEventListener("change", () => {
 
 // Click en login
 loginBtn.addEventListener("click", login);
+
+// Enter en inputs
+usernameInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") login();
+});
+passwordInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") login();
+});
 
 // -------- CONTADOR TIENDA (ENTRADAS / SALIDAS) --------
 
@@ -149,12 +163,10 @@ function renderStoreCounters(counters) {
 
   const nowStr = new Date().toLocaleTimeString();
 
-  // Buscar nombre bonito de la tienda
+  // Nombre de tienda
   let storeName = storeId;
   const found = currentStores.find((s) => s.id === storeId);
-  if (found && found.name) {
-    storeName = found.name;
-  }
+  if (found && found.name) storeName = found.name;
 
   card.innerHTML = `
     <div class="sensor-header">
@@ -208,6 +220,7 @@ refreshSelect.addEventListener("change", () => {
   }
 });
 
-// Carga inicial: mostrar mensaje de login
+// Mensaje inicial
 sensorsContainer.innerHTML =
-  "<p>Ingresa un usuario (ej: <strong>dueno1</strong> o <strong>dueno2</strong>) y presiona Entrar.</p>";
+  "<p>Inicia sesión para ver el contador de personas.</p>";
+
