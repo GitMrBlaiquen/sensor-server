@@ -12,22 +12,38 @@
     <p>Contador en tiempo real de entradas y salidas por tienda.</p>
   </header>
 
-  <main>
-    <!-- Panel de login -->
-    <section class="login-panel">
-      <h2>Iniciar sesión</h2>
-      <div class="login-controls">
-        <label>
-          Usuario:
-          <input id="usernameInput" type="text" placeholder="Ej: dueno1 o dueno2" />
-        </label>
-        <button id="loginBtn">Entrar</button>
-        <span id="loginStatus"></span>
-      </div>
-    </section>
+  <!-- PANEL DE LOGIN (pantalla inicial) -->
+  <section class="login-panel" id="loginPanel">
+    <h2>Iniciar sesión</h2>
 
-    <!-- Selector de tienda (solo se muestra tras login) -->
-    <section class="store-selector" id="storeSelectorSection" style="display: none;">
+    <div class="login-card">
+      <div class="input-group">
+        <span class="input-icon">👤</span>
+        <input
+          id="usernameInput"
+          type="text"
+          placeholder="Usuario (ej: dueno1 o dueno2)"
+        />
+      </div>
+
+      <div class="input-group">
+        <span class="input-icon">🔒</span>
+        <input
+          id="passwordInput"
+          type="password"
+          placeholder="Contraseña (ej: 1234 o 5678)"
+        />
+      </div>
+
+      <button id="loginBtn">Entrar</button>
+      <div id="loginStatus" class="login-status"></div>
+    </div>
+  </section>
+
+  <!-- CONTENIDO PRINCIPAL (se muestra SOLO tras login) -->
+  <main id="mainContent" style="display: none;">
+    <!-- Selector de tienda -->
+    <section class="store-selector" id="storeSelectorSection">
       <h2>Seleccionar tienda</h2>
       <label>
         Tienda:
