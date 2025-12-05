@@ -1,9 +1,9 @@
 // URL base de la API (ajusta si se usa IP en vez de localhost)
 const BASE_URL = "https://sensor-server-54ak.onrender.com";
 // Ejemplo con IP en red local:
-// const BASE_URL = "http://192.10.10.17:3000";
+// const BASE_URL = "http://192.10.10.17:10000";
 
-const API_URL = `${BASE_URL}/api/sensors`;
+const COUNTERS_URL = `${BASE_URL}/api/store/counters`;
 const ALERTS_URL = `${BASE_URL}/api/alerts`;
 
 const sensorsContainer = document.getElementById("sensorsContainer");
@@ -12,87 +12,78 @@ const refreshSelect = document.getElementById("refreshInterval");
 
 const alertForm = document.getElementById("alertForm");
 const alertTypeSelect = document.getElementById("alertType");
-const alertBusIdInput = document.getElementById("alertBusId");
+// Reutilizar el mismo input, pero ahora usar como "ubicación/zona"
+const alertLocationInput = document.getElementById("alertBusId");
 const alertMessageInput = document.getElementById("alertMessage");
 const alertsContainer = document.getElementById("alertsContainer");
 
 let autoRefreshId = null;
 
-// Nombres para los IDs de los sensores
-const prettyNames = {
-  "puerta-delantera": "Puerta delantera",
-  "puerta-trasera": "Puerta trasera",
-  "temperatura-bus": "Temperatura del bus",
-  "asientos-disponibles": "Asientos disponibles",
-};
-
-// Nombres para los tipos de sensores
-const prettyTypes = {
-  "contador_personas": "Contador de personas",
-  "temperatura": "Temperatura",
-  "": "",
-  "asientos": "Asientos disponibles",
-};
-
-// -------- SENSORES --------
+// -------- CONTADOR TIENDA (ENTRADAS / SALIDAS) --------
 
 async function loadSensors() {
   try {
-    sensorsContainer.innerHTML = "<p>Cargando sensores...</p>";
+    sensorsContainer.innerHTML = "<p>Cargando datos de la tienda...</p>";
 
-    const res = await fetch(API_URL);
+    const res = await fetch(COUNTERS_URL);
     if (!res.ok) {
-      throw new Error("Error al obtener los datos: " + res.status);
+      throw new Error("Error al obtener los contadores: " + res.status);
     }
 
     const data = await res.json();
-    renderSensors(data);
+    renderStoreCounters(data);
   } catch (err) {
     console.error(err);
     sensorsContainer.innerHTML =
-      `<p style="color:red;">No se pudieron cargar los datos. Revisa el servidor.</p>`;
+      `<p style="color:red;">No se pudieron cargar los datos de la tienda. Revisa el servidor.</p>`;
   }
 }
 
-function renderSensors(sensors) {
-  if (!sensors || sensors.length === 0) {
-    sensorsContainer.innerHTML = "<p>No hay sensores registrados aún.</p>";
+function renderStoreCounters(counters) {
+  if (!counters) {
+    sensorsContainer.innerHTML = "<p>No hay datos disponibles aún.</p>";
     return;
   }
 
+  const { entradas = 0, salidas = 0, dentro = 0 } = counters;
+
   sensorsContainer.innerHTML = "";
 
-  sensors.forEach((s) => {
-    const card = document.createElement("article");
-    card.className = "sensor-card";
+  const card = document.createElement("article");
+  card.className = "sensor-card";
 
-    const lastUpdate = s.lastUpdate
-      ? new Date(s.lastUpdate).toLocaleTimeString()
-      : "N/A";
+  const nowStr = new Date().toLocaleTimeString();
 
-    // Mostrar nombres amigables
-    const deviceName = prettyNames[s.deviceId] || s.deviceId;
-    const typeName = prettyTypes[s.type] || s.type || "tipo desconocido";
+  card.innerHTML = `
+    <div class="sensor-header">
+      <div class="sensor-id">Tienda comercial</div>
+      <div class="sensor-type">Contador de personas</div>
+    </div>
 
-    card.innerHTML = `
-      <div class="sensor-header">
-        <div class="sensor-id">${deviceName}</div>
-        <div class="sensor-type">${typeName}</div>
+    <div class="store-counters">
+      <div class="store-counter-item">
+        <span class="label">Personas que han ENTRADO</span>
+        <span class="value">${entradas}</span>
       </div>
-      <div class="sensor-value">
-        ${s.value !== null && s.value !== undefined ? s.value : "-"}
-        <span class="sensor-unit">${s.unit || ""}</span>
+      <div class="store-counter-item">
+        <span class="label">Personas que han SALIDO</span>
+        <span class="value">${salidas}</span>
       </div>
-      <div class="sensor-meta">
-        Última actualización: ${lastUpdate}
+      <div class="store-counter-item">
+        <span class="label">Personas DENTRO de la tienda</span>
+        <span class="value">${dentro}</span>
       </div>
-    `;
+    </div>
 
-    sensorsContainer.appendChild(card);
-  });
+    <div class="sensor-meta">
+      Última actualización: ${nowStr}
+    </div>
+  `;
+
+  sensorsContainer.appendChild(card);
 }
 
-// -------- ALERTAS --------
+// -------- ALERTAS (adaptadas a tienda) --------
 
 async function loadAlerts() {
   try {
@@ -126,25 +117,29 @@ function renderAlerts(alerts) {
     else if (a.type === "disturbio") typeClass = "alert-disturbio";
     else if (a.type === "emergencia_medica")
       typeClass = "alert-emergencia_medica";
-    else if (a.type === "falla_bus") typeClass = "alert-falla_bus";
+    else if (a.type === "falla_bus") // código legacy, pero lo usamos como falla en sistema/instalación
+      typeClass = "alert-falla_sistema";
 
     const timeStr = a.timestamp
       ? new Date(a.timestamp).toLocaleTimeString()
       : "";
 
-    // Texto legible para el tipo de alerta
+    // Texto legible para el tipo de alerta (en contexto de tienda)
     const typeTextMap = {
-      robo: "Robo / asalto",
+      robo: "Robo / hurto",
       disturbio: "Disturbio / pelea",
       emergencia_medica: "Emergencia médica",
-      falla_bus: "Falla del bus",
+      falla_bus: "Falla en sistema o infraestructura",
       otro: "Otro",
     };
     const typeText = typeTextMap[a.type] || a.type;
 
     card.className = `alert-card ${typeClass}`;
 
-    const busLabel = a.busId ? `Bus ${a.busId}` : "Bus no especificado";
+    // Usamos a.busId como "ubicación/zona" en la tienda
+    const locationLabel = a.busId
+      ? `Ubicación: ${a.busId}`
+      : "Ubicación no especificada";
 
     card.innerHTML = `
       <div class="alert-header">
@@ -152,7 +147,7 @@ function renderAlerts(alerts) {
         <span class="alert-time">${timeStr}</span>
       </div>
       <div class="alert-message">
-        <strong>${busLabel}</strong><br/>
+        <strong>${locationLabel}</strong><br/>
         ${a.message ? a.message : "<i>Sin descripción</i>"}
       </div>
     `;
@@ -166,11 +161,11 @@ alertForm.addEventListener("submit", async (e) => {
   e.preventDefault();
 
   const type = alertTypeSelect.value;
-  const busId = alertBusIdInput.value.trim();
+  const location = alertLocationInput.value.trim();
   const message = alertMessageInput.value.trim();
 
-  if (!busId) {
-    alert("Por favor, indica el bus donde ocurrió el incidente.");
+  if (!location) {
+    alert("Por favor, indica la ubicación o zona donde ocurrió el incidente.");
     return;
   }
 
@@ -182,7 +177,8 @@ alertForm.addEventListener("submit", async (e) => {
       },
       body: JSON.stringify({
         type,
-        busId,
+        // El backend aún usa el campo "busId", pero aquí lo tratamos como "ubicación"
+        busId: location,
         message,
         source: "web",
       }),
@@ -192,9 +188,8 @@ alertForm.addEventListener("submit", async (e) => {
       throw new Error("Error al enviar alerta");
     }
 
-    // Limpiar el formulario
+    // Limpiar el mensaje (puedes limpiar también la ubicación si quieres)
     alertMessageInput.value = "";
-    // alertBusIdInput.value = "";
 
     // Recargar la lista de alertas
     loadAlerts();
@@ -232,4 +227,5 @@ refreshSelect.addEventListener("change", () => {
 // Carga inicial
 loadSensors();
 loadAlerts();
+
 
