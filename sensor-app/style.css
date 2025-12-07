@@ -285,3 +285,48 @@ footer {
   color: #0A2342;
   opacity: 0.8;
 }
+
+/* ---------------- MODAL DE INACTIVIDAD ---------------- */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0; /* top:0; right:0; bottom:0; left:0; */
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+
+.modal-box {
+  background: #d7dde5;
+  padding: 24px 28px;
+  border-radius: 14px;
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.25);
+  max-width: 420px;
+  width: 90%;
+  text-align: center;
+  border-left: 6px solid #1C6DD0;
+}
+
+.modal-box h2 {
+  margin-top: 0;
+  margin-bottom: 10px;
+}
+
+.modal-box p {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.modal-actions {
+  margin-top: 16px;
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+#countdownSeconds {
+  font-weight: 700;
+}
