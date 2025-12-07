@@ -123,15 +123,13 @@ function ensureStore(storeId) {
 //   unit: "personas"
 // }
 app.post("/api/sensors/data", (req, res) => {
-  const { storeId, deviceId, type, value, unit, extra } = req.body;
+  console.log("==== DATO CRUDO DEL SENSOR ====");
+  console.log(JSON.stringify(req.body, null, 2));
+  console.log("================================");
 
-  if (!storeId) {
-    return res.status(400).json({ error: "Falta storeId" });
-  }
-  if (!deviceId) {
-    return res.status(400).json({ error: "Falta deviceId" });
-  }
-
+  // De momento no validamos nada, solo respondemos "ok"
+  res.json({ status: "ok (debug)" });
+  
   const now = new Date();
   const numericValue = value !== undefined ? Number(value) : 1;
   const safeValue = isNaN(numericValue) ? 1 : numericValue;
@@ -203,3 +201,4 @@ const PORT = process.env.PORT || 10000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Servidor TIENDAS activo en el puerto ${PORT}`);
 });
+
