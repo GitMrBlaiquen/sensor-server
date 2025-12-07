@@ -40,13 +40,13 @@ const users = {
     username: "Vicente",
     password: "Admin09867",
     role: "admin",
-    stores: Object.keys(stores), // todas las tiendas
+    stores: Object.keys(stores),
   },
   Rodrigo: {
     username: "Rodrigo",
     password: "Admin170817",
     role: "admin",
-    stores: Object.keys(stores), // todas las tiendas
+    stores: Object.keys(stores),
   },
 
   // Arrow: solo sus 3 tiendas
@@ -112,6 +112,29 @@ function ensureStore(storeId) {
     storeCounters[storeId] = { entradas: 0, salidas: 0 };
   }
 }
+
+// POST /api/sensors/data
+// Espera algo como:
+// {
+//   storeId: "arrow-01",
+//   deviceId: "t1-puerta-entrada",
+//   type: "entrada" | "salida",
+//   value: 1,
+//   unit: "personas"
+// }
+app.post("/api/sensors/data", (req, res) => {
+  const { storeId, deviceId, type, value, unit, extra } = req.body;
+
+  if (!storeId) {
+    return res.status(400).json({ error: "Falta storeId" });
+  }
+  if (!deviceId) {
+    return res.status(400).json({ error: "Falta deviceId" });
+  }
+
+  const now = new Date();
+  const numericValue = value !== undefined ? Number(value) : 1;
+  const safeValue = isNaN(numericValue) ? 1 : numericValue;
 
   // Guardar último dato del sensor
   const sensorKey = `${storeId}:${deviceId}`;
@@ -180,5 +203,3 @@ const PORT = process.env.PORT || 10000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Servidor TIENDAS activo en el puerto ${PORT}`);
 });
-
-
