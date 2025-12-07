@@ -26,11 +26,11 @@ const stores = {
   "arrow-02": { id: "arrow-02", name: "Tienda Arrow 02" },
   "arrow-03": { id: "arrow-03", name: "Tienda Arrow 03" },
 
-  // Tiendas de Leoniza
-  "leoniza-01": { id: "leoniza-01", name: "Tienda Leoniza 01" },
-  "leoniza-02": { id: "leoniza-02", name: "Tienda Leoniza 02" },
-  "leoniza-03": { id: "leoniza-03", name: "Tienda Leoniza 03" },
-  "leoniza-04": { id: "leoniza-04", name: "Tienda Leoniza 04" },
+  // Tiendas de Leonisa
+  "leonisa-01": { id: "leonisa-01", name: "Tienda Leonisa 01" },
+  "leonisa-02": { id: "leonisa-02", name: "Tienda Leonisa 02" },
+  "leonisa-03": { id: "leonisa-03", name: "Tienda Leonisa 03" },
+  "leonisa-04": { id: "leonisa-04", name: "Tienda Leonisa 04" },
 };
 
 // Usuarios del sistema
@@ -57,12 +57,12 @@ const users = {
     stores: ["arrow-01", "arrow-02", "arrow-03"],
   },
 
-  // Leoniza: sus 4 tiendas
-  Leoniza: {
-    username: "Leoniza",
-    password: "Leoniza99481",
+  // Leonisa: sus 4 tiendas
+  Leonisa: {
+    username: "Leonisa",
+    password: "Leonisa99481",
     role: "dueño",
-    stores: ["leoniza-01", "leoniza-02", "leoniza-03", "leoniza-04"],
+    stores: ["leonisa-01", "leonisa-02", "leonisa-03", "leonisa-04"],
   },
 };
 
@@ -91,7 +91,7 @@ app.post("/api/login", (req, res) => {
 
   return res.json({
     username: user.username,
-    role: user.role,   // 👈 devolvemos el rol (admin / dueño)
+    role: user.role,   // admin / dueño
     stores: userStores,
   });
 });
