@@ -6,6 +6,7 @@ const BASE_URL = window.location.origin;
 const LOGIN_URL = `${BASE_URL}/api/login`;
 const COUNTERS_URL = `${BASE_URL}/api/store/counters`;
 
+// Elementos principales
 const sensorsContainer = document.getElementById("sensorsContainer");
 const refreshBtn = document.getElementById("refreshBtn");
 const refreshSelect = document.getElementById("refreshInterval");
@@ -18,9 +19,13 @@ const passwordInput = document.getElementById("passwordInput");
 const loginBtn = document.getElementById("loginBtn");
 const loginStatus = document.getElementById("loginStatus");
 
-// (Opcional) info de usuario y logout, por si lo tienes en el HTML
+// Usuario + logout
 const userInfo = document.getElementById("userInfo");
 const logoutBtn = document.getElementById("logoutBtn");
+
+// Selector de cliente (solo admin)
+const clientSelectorSection = document.getElementById("clientSelectorSection");
+const clientSelect = document.getElementById("clientSelect");
 
 // Selector de tienda
 const storeSelectorSection = document.getElementById("storeSelectorSection");
@@ -30,11 +35,104 @@ let autoRefreshId = null;
 
 // Estado actual
 let currentUser = null;
-let currentRole = null;   // 👈 aquí guardamos admin / dueño
-let currentStores = [];
+let currentRole = null;       // "admin" o "dueño"
+let currentStores = [];       // tiendas asignadas al usuario
 let currentStoreId = null;
 
-// -------- LOGIN --------
+// Solo para admin:
+let clients = [];             // [{id: "arrow", name: "Arrow"}, ...]
+let currentClientId = null;
+
+// ------------------------------------
+// Utilidades para clientes / tiendas
+// ------------------------------------
+
+function getClientIdFromStoreId(storeId) {
+  // Ej: "arrow-01" => "arrow"
+  const parts = storeId.split("-");
+  return parts[0] || storeId;
+}
+
+function formatClientName(clientId) {
+  if (!clientId) return "";
+  return clientId.charAt(0).toUpperCase() + clientId.slice(1);
+}
+
+function buildClientsFromStores(stores) {
+  const found = new Set();
+  const list = [];
+
+  stores.forEach((store) => {
+    const clientId = getClientIdFromStoreId(store.id);
+    if (!found.has(clientId)) {
+      found.add(clientId);
+      list.push({
+        id: clientId,
+        name: formatClientName(clientId),
+      });
+    }
+  });
+
+  return list;
+}
+
+function fillClientSelect() {
+  clientSelect.innerHTML = "";
+  clients.forEach((c) => {
+    const opt = document.createElement("option");
+    opt.value = c.id;
+    opt.textContent = c.name;
+    clientSelect.appendChild(opt);
+  });
+
+  if (clients.length > 0) {
+    currentClientId = clients[0].id;
+    clientSelect.value = currentClientId;
+  }
+}
+
+function fillStoreSelectForClient(clientId) {
+  storeSelect.innerHTML = "";
+
+  const filteredStores = currentStores.filter(
+    (s) => getClientIdFromStoreId(s.id) === clientId
+  );
+
+  filteredStores.forEach((store) => {
+    const opt = document.createElement("option");
+    opt.value = store.id;
+    opt.textContent = store.name || store.id;
+    storeSelect.appendChild(opt);
+  });
+
+  if (filteredStores.length > 0) {
+    currentStoreId = filteredStores[0].id;
+    storeSelect.value = currentStoreId;
+  } else {
+    currentStoreId = null;
+  }
+}
+
+function fillStoreSelectSimple() {
+  storeSelect.innerHTML = "";
+  currentStores.forEach((store) => {
+    const opt = document.createElement("option");
+    opt.value = store.id;
+    opt.textContent = store.name || store.id;
+    storeSelect.appendChild(opt);
+  });
+
+  if (currentStores.length > 0) {
+    currentStoreId = currentStores[0].id;
+    storeSelect.value = currentStoreId;
+  } else {
+    currentStoreId = null;
+  }
+}
+
+// ------------------------------------
+// LOGIN
+// ------------------------------------
 
 async function login() {
   const username = usernameInput.value.trim();
@@ -67,7 +165,7 @@ async function login() {
 
     const data = await res.json();
     currentUser = data.username;
-    currentRole = data.role || "dueño";  // 👈 por si acaso no viniera
+    currentRole = data.role || "dueño";
     currentStores = data.stores || [];
 
     if (currentStores.length === 0) {
@@ -76,14 +174,6 @@ async function login() {
       return;
     }
 
-    // Llenar el selector de tiendas
-    fillStoreSelect();
-    storeSelectorSection.style.display = "block";
-
-    // Mensaje en consola para depurar
-    console.log(`Sesión iniciada como ${currentUser} (${currentRole})`);
-
-    // Si existe un elemento userInfo en el DOM, mostramos icono + rol
     if (userInfo) {
       const roleLabel = currentRole === "admin" ? "Administrador" : "Dueño";
       userInfo.innerHTML = `
@@ -93,16 +183,33 @@ async function login() {
       `;
     }
 
-    // Limpiar mensaje de login
+    if (currentRole === "admin") {
+      clients = buildClientsFromStores(currentStores);
+      if (clients.length > 0) {
+        fillClientSelect();
+        fillStoreSelectForClient(currentClientId);
+        clientSelectorSection.style.display = "block";
+      } else {
+        clientSelectorSection.style.display = "none";
+        fillStoreSelectSimple();
+      }
+    } else {
+      clients = [];
+      currentClientId = null;
+      clientSelectorSection.style.display = "none";
+      fillStoreSelectSimple();
+    }
+
     loginStatus.textContent = "";
+    loginPanel.style.display = "none";
+    mainContent.style.display = "block";
 
-    // Ocultar login y mostrar panel principal
-    if (loginPanel) loginPanel.style.display = "none";
-    if (mainContent) mainContent.style.display = "block";
-
-    // Cargar la primera tienda
-    currentStoreId = currentStores[0].id;
-    loadSensors();
+    if (currentStoreId) {
+      loadSensors();
+    } else {
+      sensorsContainer.innerHTML =
+        "<p>No hay tiendas disponibles para este usuario.</p>";
+    }
   } catch (err) {
     console.error(err);
     loginStatus.textContent = err.message || "No se pudo iniciar sesión.";
@@ -110,31 +217,8 @@ async function login() {
   }
 }
 
-function fillStoreSelect() {
-  storeSelect.innerHTML = "";
-  currentStores.forEach((store) => {
-    const opt = document.createElement("option");
-    opt.value = store.id;
-    opt.textContent = store.name || store.id;
-    storeSelect.appendChild(opt);
-  });
-
-  if (currentStores.length > 0) {
-    currentStoreId = currentStores[0].id;
-    storeSelect.value = currentStoreId;
-  }
-}
-
-// Cambiar tienda seleccionada
-storeSelect.addEventListener("change", () => {
-  currentStoreId = storeSelect.value;
-  loadSensors();
-});
-
-// Click en login
+// Eventos login
 loginBtn.addEventListener("click", login);
-
-// Enter en inputs
 usernameInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") login();
 });
@@ -142,7 +226,9 @@ passwordInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") login();
 });
 
-// -------- LOGOUT (opcional, si tienes un botón) --------
+// ------------------------------------
+// LOGOUT
+// ------------------------------------
 
 function logout() {
   if (autoRefreshId) {
@@ -154,29 +240,55 @@ function logout() {
   currentRole = null;
   currentStores = [];
   currentStoreId = null;
+  clients = [];
+  currentClientId = null;
 
   if (userInfo) userInfo.textContent = "";
   storeSelect.innerHTML = "";
+  clientSelect.innerHTML = "";
+  clientSelectorSection.style.display = "none";
+
   sensorsContainer.innerHTML =
     "<p>Inicia sesión para ver el contador de personas.</p>";
+
   loginStatus.textContent = "";
   usernameInput.value = "";
   passwordInput.value = "";
 
-  if (mainContent) mainContent.style.display = "none";
-  if (loginPanel) loginPanel.style.display = "block";
+  mainContent.style.display = "none";
+  loginPanel.style.display = "block";
 }
 
-if (logoutBtn) {
-  logoutBtn.addEventListener("click", logout);
-}
+logoutBtn.addEventListener("click", logout);
 
-// -------- CONTADOR TIENDA (ENTRADAS / SALIDAS) --------
+// ------------------------------------
+// SELECTORES (cliente y tienda)
+// ------------------------------------
+
+clientSelect.addEventListener("change", () => {
+  currentClientId = clientSelect.value;
+  fillStoreSelectForClient(currentClientId);
+  if (currentStoreId) {
+    loadSensors();
+  } else {
+    sensorsContainer.innerHTML =
+      "<p>No hay tiendas asociadas a este cliente.</p>";
+  }
+});
+
+storeSelect.addEventListener("change", () => {
+  currentStoreId = storeSelect.value;
+  loadSensors();
+});
+
+// ------------------------------------
+// CONTADOR TIENDA (ENTRADAS / SALIDAS)
+// ------------------------------------
 
 async function loadSensors() {
   if (!currentStoreId) {
     sensorsContainer.innerHTML =
-      "<p>Inicia sesión y selecciona una tienda para ver los datos.</p>";
+      "<p>Selecciona una tienda para ver los datos.</p>";
     return;
   }
 
@@ -213,7 +325,6 @@ function renderStoreCounters(counters) {
 
   const nowStr = new Date().toLocaleTimeString();
 
-  // Nombre de tienda
   let storeName = storeId;
   const found = currentStores.find((s) => s.id === storeId);
   if (found && found.name) storeName = found.name;
@@ -247,14 +358,14 @@ function renderStoreCounters(counters) {
   sensorsContainer.appendChild(card);
 }
 
-// -------- CONTROLES GENERALES --------
+// ------------------------------------
+// CONTROLES GENERALES
+// ------------------------------------
 
-// Botón de refresco manual
 refreshBtn.addEventListener("click", () => {
   loadSensors();
 });
 
-// Auto-actualización
 refreshSelect.addEventListener("change", () => {
   const interval = Number(refreshSelect.value);
 
