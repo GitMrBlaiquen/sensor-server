@@ -113,27 +113,6 @@ function ensureStore(storeId) {
   }
 }
 
-// POST /api/sensors/data
-// Espera algo como:
-// {
-//   storeId: "arrow-01",
-//   deviceId: "puerta-entrada",
-//   type: "entrada" | "salida",
-//   value: 1,
-//   unit: "personas"
-// }
-app.post("/api/sensors/data", (req, res) => {
-  console.log("==== DATO CRUDO DEL SENSOR ====");
-  console.log(JSON.stringify(req.body, null, 2));
-  console.log("================================");
-
-  // De momento no validamos nada, solo respondemos "ok"
-  res.json({ status: "ok (debug)" });
-  
-  const now = new Date();
-  const numericValue = value !== undefined ? Number(value) : 1;
-  const safeValue = isNaN(numericValue) ? 1 : numericValue;
-
   // Guardar último dato del sensor
   const sensorKey = `${storeId}:${deviceId}`;
   sensors[sensorKey] = {
@@ -201,4 +180,5 @@ const PORT = process.env.PORT || 10000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Servidor TIENDAS activo en el puerto ${PORT}`);
 });
+
 
