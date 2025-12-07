@@ -31,6 +31,12 @@ const clientSelect = document.getElementById("clientSelect");
 const storeSelectorSection = document.getElementById("storeSelectorSection");
 const storeSelect = document.getElementById("storeSelect");
 
+// Modal de inactividad
+const sessionWarningModal = document.getElementById("sessionWarningModal");
+const stayLoggedBtn = document.getElementById("stayLoggedBtn");
+const logoutNowBtn = document.getElementById("logoutNowBtn");
+const countdownSpan = document.getElementById("countdownSeconds");
+
 let autoRefreshId = null;
 
 // Estado actual
@@ -43,12 +49,22 @@ let currentStoreId = null;
 let clients = [];             // [{id: "arrow", name: "Arrow"}, ...]
 let currentClientId = null;
 
+// ---------------- TIEMPO DE INACTIVIDAD ----------------
+
+// 5 minutos sin actividad -> mostrar aviso
+const INACTIVITY_LIMIT_MS = 5 * 60 * 1000;
+// 60 segundos de cuenta regresiva antes de cerrar sesión
+const WARNING_DURATION_MS = 60 * 1000;
+
+let inactivityTimer = null;
+let logoutTimer = null;
+let countdownInterval = null;
+
 // ------------------------------------
 // Utilidades para clientes / tiendas
 // ------------------------------------
 
 function getClientIdFromStoreId(storeId) {
-  // Ej: "arrow-01" => "arrow"
   const parts = storeId.split("-");
   return parts[0] || storeId;
 }
@@ -131,6 +147,78 @@ function fillStoreSelectSimple() {
 }
 
 // ------------------------------------
+// INACTIVIDAD: POP-UP Y TIMERS
+// ------------------------------------
+
+function clearInactivityTimers() {
+  clearTimeout(inactivityTimer);
+  clearTimeout(logoutTimer);
+  clearInterval(countdownInterval);
+  inactivityTimer = null;
+  logoutTimer = null;
+  countdownInterval = null;
+}
+
+function showInactivityWarning() {
+  if (!currentUser) return;
+  if (!sessionWarningModal) return;
+
+  sessionWarningModal.style.display = "flex";
+
+  let remaining = Math.floor(WARNING_DURATION_MS / 1000);
+  if (countdownSpan) countdownSpan.textContent = remaining;
+
+  clearInterval(countdownInterval);
+  countdownInterval = setInterval(() => {
+    remaining -= 1;
+    if (remaining < 0) remaining = 0;
+    if (countdownSpan) countdownSpan.textContent = remaining;
+  }, 1000);
+
+  logoutTimer = setTimeout(() => {
+    logout(); // Usamos el mismo logout general
+  }, WARNING_DURATION_MS);
+}
+
+function hideInactivityWarning() {
+  if (sessionWarningModal) {
+    sessionWarningModal.style.display = "none";
+  }
+  clearInterval(countdownInterval);
+  countdownInterval = null;
+}
+
+function resetInactivityTimers() {
+  // Solo tiene sentido si hay usuario logueado
+  if (!currentUser) return;
+
+  hideInactivityWarning();
+  clearInactivityTimers();
+
+  inactivityTimer = setTimeout(showInactivityWarning, INACTIVITY_LIMIT_MS);
+}
+
+// Escuchamos actividad global para reiniciar temporizador
+["click", "keydown", "mousemove", "scroll", "touchstart"].forEach((evt) => {
+  document.addEventListener(evt, () => {
+    resetInactivityTimers();
+  });
+});
+
+// Botones del pop-up
+if (stayLoggedBtn) {
+  stayLoggedBtn.addEventListener("click", () => {
+    resetInactivityTimers();
+  });
+}
+
+if (logoutNowBtn) {
+  logoutNowBtn.addEventListener("click", () => {
+    logout();
+  });
+}
+
+// ------------------------------------
 // LOGIN
 // ------------------------------------
 
@@ -204,6 +292,9 @@ async function login() {
     loginPanel.style.display = "none";
     mainContent.style.display = "block";
 
+    // Iniciar control de inactividad
+    resetInactivityTimers();
+
     if (currentStoreId) {
       loadSensors();
     } else {
@@ -235,6 +326,10 @@ function logout() {
     clearInterval(autoRefreshId);
     autoRefreshId = null;
   }
+
+  // Limpiar timers de inactividad y ocultar pop-up
+  clearInactivityTimers();
+  hideInactivityWarning();
 
   currentUser = null;
   currentRole = null;
