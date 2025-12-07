@@ -22,7 +22,7 @@
         <input
           id="usernameInput"
           type="text"
-          placeholder="Usuario" 
+          placeholder="Usuario"
         />
       </div>
 
@@ -46,12 +46,21 @@
     <!-- Barra de usuario: icono + nombre + rol + logout -->
     <section class="user-bar">
       <div class="user-left">
-        <!-- Aquí app.js escribe: 👤 Vicente (Administrador) o 👤 Arrow (Dueño) -->
+        <!-- app.js escribe aquí: 👤 Vicente (Administrador) o 👤 Arrow (Dueño) -->
         <span id="userInfo"></span>
       </div>
       <div class="user-right">
         <button id="logoutBtn" class="logout-btn">Cerrar sesión</button>
       </div>
+    </section>
+
+    <!-- Selector de cliente (solo para administradores) -->
+    <section class="client-selector" id="clientSelectorSection" style="display: none;">
+      <h2>Seleccionar cliente</h2>
+      <label>
+        Cliente:
+        <select id="clientSelect"></select>
+      </label>
     </section>
 
     <!-- Selector de tienda -->
@@ -81,14 +90,28 @@
     <section id="sensorsContainer">
       <!-- Aquí se mostrará el resumen de entradas / salidas / dentro -->
     </section>
+
+    <!-- AVISO DE INACTIVIDAD / POP-UP -->
+    <section id="sessionWarningModal" class="modal-overlay" style="display: none;">
+      <div class="modal-box">
+        <h2>Sesión inactiva</h2>
+        <p>
+          No se ha detectado actividad. Serás desconectado en
+          <strong><span id="countdownSeconds">60</span> segundos</strong>.
+        </p>
+        <div class="modal-actions">
+          <button id="stayLoggedBtn">Seguir conectado</button>
+          <button id="logoutNowBtn" class="logout-btn">Cerrar sesión ahora</button>
+        </div>
+      </div>
+    </section>
+
   </main>
 
   <footer>
-    <small>Proyecto creado por Vicente Becerra – Contador de Personas para Tiendas Comerciales</small>
+    <small>Proyecto creado por Vicente Becerra y Rodrigo Becerra – Contador de Personas para Tiendas Comerciales</small>
   </footer>
 
   <script src="app.js"></script>
 </body>
 </html>
-
-
