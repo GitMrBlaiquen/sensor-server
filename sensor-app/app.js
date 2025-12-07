@@ -51,10 +51,10 @@ let currentClientId = null;
 
 // ---------------- TIEMPO DE INACTIVIDAD ----------------
 
-// 5 minutos sin actividad -> mostrar aviso
-const INACTIVITY_LIMIT_MS = 5 * 60 * 1000;
-// 60 segundos de cuenta regresiva antes de cerrar sesión
-const WARNING_DURATION_MS = 60 * 1000;
+// 1 minuto sin actividad -> mostrar aviso
+const INACTIVITY_LIMIT_MS = 1 * 60 * 1000;
+// 30 segundos de cuenta regresiva antes de cerrar sesión
+const WARNING_DURATION_MS = 30 * 1000;
 
 let inactivityTimer = null;
 let logoutTimer = null;
@@ -479,3 +479,4 @@ refreshSelect.addEventListener("change", () => {
 // Mensaje inicial
 sensorsContainer.innerHTML =
   "<p>Inicia sesión para ver el contador de personas.</p>";
+
