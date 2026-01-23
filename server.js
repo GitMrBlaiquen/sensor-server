@@ -6,11 +6,16 @@ const app = express();
 
 // --- Middlewares ---
 app.use(cors());
-app.use(express.json({ limit: "1mb" }));
+
+// JSON normal (simulador + algunos sensores)
+app.use(express.json({ limit: "2mb" }));
+app.use(express.urlencoded({ extended: true }));
+
+// Para capturar texto/XML crudo en endpoints específicos
+const rawText = express.text({ type: "*/*", limit: "2mb" });
 
 // --- Servir el frontend (sensor-app) ---
 app.use(express.static(path.join(__dirname, "sensor-app")));
-
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "sensor-app", "index.html"));
 });
@@ -65,7 +70,6 @@ const users = {
 // ---------------------   LOGIN DE USUARIOS   ------------------
 // --------------------------------------------------------------
 
-// POST /api/login
 app.post("/api/login", (req, res) => {
   const { username, password } = req.body;
 
@@ -78,13 +82,11 @@ app.post("/api/login", (req, res) => {
     return res.status(401).json({ error: "Usuario o contraseña inválidos" });
   }
 
-  const userStores = user.stores
-    .map((storeId) => stores[storeId])
-    .filter(Boolean);
+  const userStores = user.stores.map((id) => stores[id]).filter(Boolean);
 
   return res.json({
     username: user.username,
-    role: user.role, // admin / dueño
+    role: user.role,
     stores: userStores,
   });
 });
@@ -93,7 +95,7 @@ app.post("/api/login", (req, res) => {
 // -----------   CONTADOR DE PERSONAS POR TIENDA   --------------
 // --------------------------------------------------------------
 
-// Último dato por sensor (debug)
+// Debug: últimos payloads
 const sensors = {};
 
 // Contadores por tienda
@@ -105,147 +107,192 @@ function ensureStore(storeId) {
 }
 
 // --------------------------------------------------------------
-//  1) ENDPOINT “ANTIGUO” (simulador / pruebas manuales)
+//  MAPEO: 1 SENSOR REAL = 1 TIENDA
+//  (Pon aquí el SN/DeviceId real del sensor -> tienda)
 // --------------------------------------------------------------
-//
-// POST /api/sensors/data
-// {
-//   storeId: "arrow-01",
-//   deviceId: "t1-puerta-entrada",
-//   type: "entrada" | "salida",
-//   value: 1,
-//   unit: "personas"
-// }
+const DEVICE_TO_STORE = {
+   "22100000250715250": "arrow-01",
+};
+
+function getStoreIdFromDevice(deviceId) {
+  if (!deviceId) return null;
+  return DEVICE_TO_STORE[String(deviceId)] || null;
+}
+
+// --------------------------------------------------------------
+// 1) ENDPOINT “ANTIGUO” (simulador / pruebas manuales)
+// --------------------------------------------------------------
 app.post("/api/sensors/data", (req, res) => {
   const { storeId, deviceId, type, value, unit, extra } = req.body;
 
   if (!storeId) return res.status(400).json({ error: "Falta storeId" });
   if (!deviceId) return res.status(400).json({ error: "Falta deviceId" });
 
+  ensureStore(storeId);
+
   const now = new Date();
   const numericValue = value !== undefined ? Number(value) : 1;
   const safeValue = Number.isFinite(numericValue) ? numericValue : 1;
 
   const sensorKey = `${storeId}:${deviceId}`;
-  sensors[sensorKey] = {
-    storeId,
-    deviceId,
-    type: type || "desconocido",
-    value: safeValue,
-    unit: unit || "",
-    extra: extra || {},
-    lastUpdate: now,
-  };
+  sensors[sensorKey] = { storeId, deviceId, type, value: safeValue, unit: unit || "", extra: extra || {}, lastUpdate: now };
 
-  ensureStore(storeId);
   if (type === "entrada") storeCounters[storeId].entradas += safeValue;
   else if (type === "salida") storeCounters[storeId].salidas += safeValue;
 
-  console.log("🧪 Dato (simulador) recibido:", sensors[sensorKey]);
-
-  res.json({ status: "ok" });
+  console.log("🧪 Simulador:", sensors[sensorKey]);
+  return res.json({ status: "ok" });
 });
 
 // --------------------------------------------------------------
-//  2) ENDPOINTS DEL SENSOR REAL (los que pide el PDF)
+// 2) ENDPOINTS “SENSOR REAL” (compatibles con JSON y XML)
+//    Como NO sabemos exactamente el formato, aceptamos:
+//    - /api/camera/heartBeat   /api/camera/dataUpload
+//    - /heartbeat             /api/posttest
 // --------------------------------------------------------------
-//
-// IMPORTANTE: debes mapear el SN del sensor a una tienda.
-//
-// EJEMPLO:
-//   "201000002412101534": "arrow-01"
-//
-const SN_TO_STORE = {
-   "22100000250715250": "arrow-01",
-};
 
-function getStoreIdFromSN(sn) {
-  if (!sn) return null;
-  return SN_TO_STORE[String(sn)] || null;
+// ---- helpers de parseo ----
+function tryParseJSON(text) {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
 }
 
-// POST /api/camera/heartBeat
-app.post("/api/camera/heartBeat", (req, res) => {
-  // El sensor suele enviar { sn, time, ... }
-  console.log("❤️ heartBeat:", req.body);
+// Parseo XML MUY simple (para detectar algunos campos típicos)
+function extractXmlValue(xml, tag) {
+  const re = new RegExp(`<${tag}>([^<]*)</${tag}>`, "i");
+  const m = String(xml).match(re);
+  return m ? m[1] : null;
+}
 
-  // Respuesta que el sensor espera: code=0
+function normalizeCounts(obj) {
+  // Intenta leer varios nombres típicos de conteo
+  const entradas =
+    obj.in ?? obj.enter ?? obj.Enter ?? obj.In ?? obj.inNum ?? obj.InNum ?? obj.inCount ?? obj.EnterCount ?? 0;
+
+  const salidas =
+    obj.out ?? obj.leave ?? obj.Leave ?? obj.Out ?? obj.outNum ?? obj.OutNum ?? obj.outCount ?? obj.LeaveCount ?? 0;
+
+  const e = Number(entradas);
+  const s = Number(salidas);
+
+  return {
+    entradas: Number.isFinite(e) ? e : 0,
+    salidas: Number.isFinite(s) ? s : 0,
+  };
+}
+
+function okSensor(res, extraData = {}) {
+  // Muchos sensores esperan code=0
   return res.json({
     code: 0,
     msg: "success",
     data: {
       time: Math.floor(Date.now() / 1000),
-      uploadInterval: 1, // minutos (ajústalo si quieres)
-      dataMode: "Add",
+      ...extraData,
     },
   });
+}
+
+// ---- heartbeats ----
+app.post("/api/camera/heartBeat", (req, res) => {
+  console.log("❤️ heartBeat (json):", req.body);
+  return okSensor(res, { uploadInterval: 1, dataMode: "Add" });
 });
 
-// POST /api/camera/dataUpload
+app.post("/heartbeat", rawText, (req, res) => {
+  console.log("❤️ heartBeat (raw):", req.body);
+  return okSensor(res, { uploadInterval: 1, dataMode: "Add" });
+});
+
+// ---- data upload (JSON típico) ----
 app.post("/api/camera/dataUpload", (req, res) => {
-  console.log("📦 dataUpload:", req.body);
-
   const body = req.body || {};
-  const sn = body.sn || body.SN || body.deviceId || body.DeviceId; // por si viene con nombre distinto
-  const storeId = getStoreIdFromSN(sn);
+  console.log("📦 dataUpload (json):", body);
 
-  // Si no está mapeado, igual se responde success para que no “se corte”,
-  // pero dejamos log claro.
+  const deviceId = body.sn || body.SN || body.deviceId || body.DeviceId || body.id || body.ID;
+  const storeId = getStoreIdFromDevice(deviceId);
+
   if (!storeId) {
-    console.warn(
-      "⚠️ Llegó dataUpload pero el SN no está mapeado a una tienda. SN:",
-      sn
-    );
-
-    return res.json({
-      code: 0,
-      msg: "success",
-      data: { time: Math.floor(Date.now() / 1000) },
-    });
+    console.warn("⚠️ dataUpload recibido pero DEVICE/SN no está mapeado:", deviceId);
+    sensors[`unknown:SN:${deviceId || "no-id"}`] = { storeId: null, deviceId, type: "sensor-real", extra: body, lastUpdate: new Date() };
+    return okSensor(res);
   }
 
   ensureStore(storeId);
 
-  // Según muchos sensores de conteo, llegan como in/out o enter/leave
-  const entradas = Number(body.in ?? body.enter ?? body.In ?? body.Enter ?? 0);
-  const salidas = Number(body.out ?? body.leave ?? body.Out ?? body.Leave ?? 0);
+  const { entradas, salidas } = normalizeCounts(body);
+  storeCounters[storeId].entradas += entradas;
+  storeCounters[storeId].salidas += salidas;
 
-  const safeEntradas = Number.isFinite(entradas) ? entradas : 0;
-  const safeSalidas = Number.isFinite(salidas) ? salidas : 0;
+  sensors[`${storeId}:SN:${deviceId}`] = { storeId, deviceId: `SN:${deviceId}`, type: "sensor-real", extra: body, lastUpdate: new Date() };
 
-  storeCounters[storeId].entradas += safeEntradas;
-  storeCounters[storeId].salidas += safeSalidas;
+  console.log(`✅ ${storeId} (SN ${deviceId}) +E ${entradas} +S ${salidas}`);
+  return okSensor(res);
+});
 
-  // Guardar como “sensor” debug
-  const sensorKey = `${storeId}:SN:${sn || "unknown"}`;
-  sensors[sensorKey] = {
-    storeId,
-    deviceId: `SN:${sn || "unknown"}`,
-    type: "sensor-real",
-    value: null,
-    unit: "",
-    extra: body,
-    lastUpdate: new Date(),
-  };
+// ---- data upload (XML típico / posttest) ----
+app.post("/api/posttest", rawText, (req, res) => {
+  const raw = req.body || "";
+  console.log("📦 posttest (raw):", raw);
 
-  console.log(
-    `✅ Tienda ${storeId} (SN ${sn}) -> +Entradas ${safeEntradas}, +Salidas ${safeSalidas}`
-  );
+  // 1) intenta JSON en texto
+  const asJson = tryParseJSON(raw);
+  if (asJson) {
+    // reusa la lógica JSON
+    req.body = asJson;
+    return app._router.handle(req, res, () => {});
+  }
 
-  return res.json({
-    code: 0,
-    msg: "success",
-    data: {
-      time: Math.floor(Date.now() / 1000),
-    },
-  });
+  // 2) intenta XML
+  // Estos tags dependen del sensor: ponemos opciones típicas
+  const deviceId =
+    extractXmlValue(raw, "sn") ||
+    extractXmlValue(raw, "SN") ||
+    extractXmlValue(raw, "deviceId") ||
+    extractXmlValue(raw, "DeviceId") ||
+    extractXmlValue(raw, "id");
+
+  const storeId = getStoreIdFromDevice(deviceId);
+  if (!storeId) {
+    console.warn("⚠️ XML recibido pero DEVICE/SN no mapeado:", deviceId);
+    sensors[`unknown:SN:${deviceId || "no-id"}`] = { storeId: null, deviceId, type: "sensor-real-xml", extra: { raw }, lastUpdate: new Date() };
+    return okSensor(res);
+  }
+
+  ensureStore(storeId);
+
+  const inVal =
+    extractXmlValue(raw, "in") ||
+    extractXmlValue(raw, "enter") ||
+    extractXmlValue(raw, "Enter") ||
+    extractXmlValue(raw, "inNum") ||
+    "0";
+
+  const outVal =
+    extractXmlValue(raw, "out") ||
+    extractXmlValue(raw, "leave") ||
+    extractXmlValue(raw, "Leave") ||
+    extractXmlValue(raw, "outNum") ||
+    "0";
+
+  const entradas = Number(inVal);
+  const salidas = Number(outVal);
+
+  storeCounters[storeId].entradas += Number.isFinite(entradas) ? entradas : 0;
+  storeCounters[storeId].salidas += Number.isFinite(salidas) ? salidas : 0;
+
+  sensors[`${storeId}:SN:${deviceId}`] = { storeId, deviceId: `SN:${deviceId}`, type: "sensor-real-xml", extra: { raw }, lastUpdate: new Date() };
+
+  console.log(`✅ ${storeId} (SN ${deviceId}) XML +E ${entradas} +S ${salidas}`);
+  return okSensor(res);
 });
 
 // --------------------------------------------------------------
 // ------------------------   CONSULTAS WEB   -------------------
 // --------------------------------------------------------------
-
-// GET /api/store/counters?storeId=arrow-01
 app.get("/api/store/counters", (req, res) => {
   const { storeId } = req.query;
   if (!storeId) return res.status(400).json({ error: "Falta storeId en la query" });
@@ -257,25 +304,15 @@ app.get("/api/store/counters", (req, res) => {
   res.json({ storeId, entradas, salidas, dentro });
 });
 
-// (Opcional) lista de tiendas
-app.get("/api/stores", (req, res) => {
-  res.json(Object.values(stores));
-});
+app.get("/api/stores", (req, res) => res.json(Object.values(stores)));
 
-// (Opcional) debug sensores
-app.get("/api/sensors", (req, res) => {
-  res.json(Object.values(sensors));
-});
+app.get("/api/sensors", (req, res) => res.json(Object.values(sensors)));
 
-// (Opcional) ver contadores internos (debug)
-app.get("/api/debug/counters", (req, res) => {
-  res.json(storeCounters);
-});
+app.get("/api/debug/counters", (req, res) => res.json(storeCounters));
 
 // --------------------------------------------------------------
 // ---------------------   INICIO DEL SERVER   ------------------
 // --------------------------------------------------------------
-
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Servidor TIENDAS activo en el puerto ${PORT}`);
