@@ -28,6 +28,21 @@ function okSensor(res, extraData = {}) {
   });
 }
 
+function safeBodyText(req) {
+  const b = req.body;
+
+  if (b == null) return "";
+  if (typeof b === "string") return b;
+  if (Buffer.isBuffer(b)) return b.toString("utf8");
+
+  // Si vino como objeto (ej: {}), lo convertimos
+  try {
+    return JSON.stringify(b);
+  } catch {
+    return String(b);
+  }
+}
+
 function logRequest(tag, req) {
   console.log("\n==============================");
   console.log("📦", tag);
@@ -36,7 +51,8 @@ function logRequest(tag, req) {
   console.log("Content-Type:", req.headers["content-type"]);
   console.log("From:", req.socket.remoteAddress);
 
-  const raw = (req.body || "").trim();
+  const raw = safeBodyText(req).trim();
+
   if (!raw) {
     console.log("Body: (vacío)");
     return;
@@ -55,7 +71,10 @@ app.get("/health", (req, res) => {
   res.json({ ok: true, time: new Date().toISOString() });
 });
 
-// Rutas “oficiales” del PDF
+// Evita el ruido del navegador
+app.get("/favicon.ico", (req, res) => res.status(204).end());
+
+// Rutas del sensor
 app.post("/api/camera/heartBeat", (req, res) => {
   logRequest("HEARTBEAT /api/camera/heartBeat", req);
   return okSensor(res, { uploadInterval: 1, dataMode: "Add" });
@@ -66,7 +85,7 @@ app.post("/api/camera/dataUpload", (req, res) => {
   return okSensor(res);
 });
 
-// Rutas “compatibles” que suele traer tu software
+// Rutas compatibles con tu software
 app.post("/heartbeat", (req, res) => {
   logRequest("HEARTBEAT /heartbeat", req);
   return okSensor(res, { uploadInterval: 1, dataMode: "Add" });
@@ -77,13 +96,12 @@ app.post("/api/posttest", (req, res) => {
   return okSensor(res);
 });
 
-// Si el sensor pega a cualquier otra ruta:
+// Cualquier otra ruta
 app.use((req, res) => {
   logRequest("RUTA NO CONFIGURADA", req);
   res.status(404).json({ error: "Ruta no configurada en debug-sensor" });
 });
 
-// Puerto (si lo subes a Render, usa process.env.PORT)
 const PORT = process.env.PORT || 8088;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ debug-sensor escuchando en http://0.0.0.0:${PORT}`);
