@@ -6,7 +6,7 @@ const app = express();
 
 // --- Middlewares ---
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: "1mb" }));
 
 // --- Servir el frontend (sensor-app) ---
 app.use(express.static(path.join(__dirname, "sensor-app")));
@@ -35,7 +35,6 @@ const stores = {
 
 // Usuarios del sistema
 const users = {
-  // Administradores: ven TODAS las tiendas
   Vicente: {
     username: "Vicente",
     password: "Admin09867",
@@ -48,16 +47,12 @@ const users = {
     role: "admin",
     stores: Object.keys(stores),
   },
-
-  // Arrow: solo sus 3 tiendas
   Arrow: {
     username: "Arrow",
     password: "Arrow57105",
     role: "dueño",
     stores: ["arrow-01", "arrow-02", "arrow-03"],
   },
-
-  // Leonisa: sus 4 tiendas
   Leonisa: {
     username: "Leonisa",
     password: "Leonisa99481",
@@ -71,8 +66,6 @@ const users = {
 // --------------------------------------------------------------
 
 // POST /api/login
-// Body: { username: "Vicente", password: "Admin09867" }
-// Respuesta: { username, role, stores: [ {id, name}, ... ] }
 app.post("/api/login", (req, res) => {
   const { username, password } = req.body;
 
@@ -91,7 +84,7 @@ app.post("/api/login", (req, res) => {
 
   return res.json({
     username: user.username,
-    role: user.role,   // admin / dueño
+    role: user.role, // admin / dueño
     stores: userStores,
   });
 });
@@ -100,21 +93,22 @@ app.post("/api/login", (req, res) => {
 // -----------   CONTADOR DE PERSONAS POR TIENDA   --------------
 // --------------------------------------------------------------
 
-// Último dato por sensor (para debug)
+// Último dato por sensor (debug)
 const sensors = {};
 
-// Contadores por tienda:
-// storeCounters["arrow-01"] = { entradas: X, salidas: Y }
+// Contadores por tienda
 const storeCounters = {};
-
 function ensureStore(storeId) {
   if (!storeCounters[storeId]) {
     storeCounters[storeId] = { entradas: 0, salidas: 0 };
   }
 }
 
+// --------------------------------------------------------------
+//  1) ENDPOINT “ANTIGUO” (simulador / pruebas manuales)
+// --------------------------------------------------------------
+//
 // POST /api/sensors/data
-// Espera algo como:
 // {
 //   storeId: "arrow-01",
 //   deviceId: "t1-puerta-entrada",
@@ -125,18 +119,13 @@ function ensureStore(storeId) {
 app.post("/api/sensors/data", (req, res) => {
   const { storeId, deviceId, type, value, unit, extra } = req.body;
 
-  if (!storeId) {
-    return res.status(400).json({ error: "Falta storeId" });
-  }
-  if (!deviceId) {
-    return res.status(400).json({ error: "Falta deviceId" });
-  }
+  if (!storeId) return res.status(400).json({ error: "Falta storeId" });
+  if (!deviceId) return res.status(400).json({ error: "Falta deviceId" });
 
   const now = new Date();
   const numericValue = value !== undefined ? Number(value) : 1;
-  const safeValue = isNaN(numericValue) ? 1 : numericValue;
+  const safeValue = Number.isFinite(numericValue) ? numericValue : 1;
 
-  // Guardar último dato del sensor
   const sensorKey = `${storeId}:${deviceId}`;
   sensors[sensorKey] = {
     storeId,
@@ -148,51 +137,139 @@ app.post("/api/sensors/data", (req, res) => {
     lastUpdate: now,
   };
 
-  // Actualizar contadores de la tienda
   ensureStore(storeId);
-  if (type === "entrada") {
-    storeCounters[storeId].entradas += safeValue;
-  } else if (type === "salida") {
-    storeCounters[storeId].salidas += safeValue;
-  }
+  if (type === "entrada") storeCounters[storeId].entradas += safeValue;
+  else if (type === "salida") storeCounters[storeId].salidas += safeValue;
 
-  console.log("Dato recibido:", sensors[sensorKey]);
-  console.log(
-    `Tienda ${storeId} -> Entradas: ${storeCounters[storeId].entradas}, Salidas: ${storeCounters[storeId].salidas}`
-  );
+  console.log("🧪 Dato (simulador) recibido:", sensors[sensorKey]);
 
   res.json({ status: "ok" });
 });
 
+// --------------------------------------------------------------
+//  2) ENDPOINTS DEL SENSOR REAL (los que pide el PDF)
+// --------------------------------------------------------------
+//
+// IMPORTANTE: debes mapear el SN del sensor a una tienda.
+//
+// EJEMPLO:
+//   "201000002412101534": "arrow-01"
+//
+const SN_TO_STORE = {
+   "22100000250715250": "arrow-01",
+};
+
+function getStoreIdFromSN(sn) {
+  if (!sn) return null;
+  return SN_TO_STORE[String(sn)] || null;
+}
+
+// POST /api/camera/heartBeat
+app.post("/api/camera/heartBeat", (req, res) => {
+  // El sensor suele enviar { sn, time, ... }
+  console.log("❤️ heartBeat:", req.body);
+
+  // Respuesta que el sensor espera: code=0
+  return res.json({
+    code: 0,
+    msg: "success",
+    data: {
+      time: Math.floor(Date.now() / 1000),
+      uploadInterval: 1, // minutos (ajústalo si quieres)
+      dataMode: "Add",
+    },
+  });
+});
+
+// POST /api/camera/dataUpload
+app.post("/api/camera/dataUpload", (req, res) => {
+  console.log("📦 dataUpload:", req.body);
+
+  const body = req.body || {};
+  const sn = body.sn || body.SN || body.deviceId || body.DeviceId; // por si viene con nombre distinto
+  const storeId = getStoreIdFromSN(sn);
+
+  // Si no está mapeado, igual se responde success para que no “se corte”,
+  // pero dejamos log claro.
+  if (!storeId) {
+    console.warn(
+      "⚠️ Llegó dataUpload pero el SN no está mapeado a una tienda. SN:",
+      sn
+    );
+
+    return res.json({
+      code: 0,
+      msg: "success",
+      data: { time: Math.floor(Date.now() / 1000) },
+    });
+  }
+
+  ensureStore(storeId);
+
+  // Según muchos sensores de conteo, llegan como in/out o enter/leave
+  const entradas = Number(body.in ?? body.enter ?? body.In ?? body.Enter ?? 0);
+  const salidas = Number(body.out ?? body.leave ?? body.Out ?? body.Leave ?? 0);
+
+  const safeEntradas = Number.isFinite(entradas) ? entradas : 0;
+  const safeSalidas = Number.isFinite(salidas) ? salidas : 0;
+
+  storeCounters[storeId].entradas += safeEntradas;
+  storeCounters[storeId].salidas += safeSalidas;
+
+  // Guardar como “sensor” debug
+  const sensorKey = `${storeId}:SN:${sn || "unknown"}`;
+  sensors[sensorKey] = {
+    storeId,
+    deviceId: `SN:${sn || "unknown"}`,
+    type: "sensor-real",
+    value: null,
+    unit: "",
+    extra: body,
+    lastUpdate: new Date(),
+  };
+
+  console.log(
+    `✅ Tienda ${storeId} (SN ${sn}) -> +Entradas ${safeEntradas}, +Salidas ${safeSalidas}`
+  );
+
+  return res.json({
+    code: 0,
+    msg: "success",
+    data: {
+      time: Math.floor(Date.now() / 1000),
+    },
+  });
+});
+
+// --------------------------------------------------------------
+// ------------------------   CONSULTAS WEB   -------------------
+// --------------------------------------------------------------
+
 // GET /api/store/counters?storeId=arrow-01
-// Devuelve contadores de UNA tienda
 app.get("/api/store/counters", (req, res) => {
   const { storeId } = req.query;
-
-  if (!storeId) {
-    return res.status(400).json({ error: "Falta storeId en la query" });
-  }
+  if (!storeId) return res.status(400).json({ error: "Falta storeId en la query" });
 
   ensureStore(storeId);
   const { entradas, salidas } = storeCounters[storeId];
   const dentro = Math.max(entradas - salidas, 0);
 
-  res.json({
-    storeId,
-    entradas,
-    salidas,
-    dentro,
-  });
+  res.json({ storeId, entradas, salidas, dentro });
 });
 
-// (Opcional) lista de todas las tiendas
+// (Opcional) lista de tiendas
 app.get("/api/stores", (req, res) => {
   res.json(Object.values(stores));
 });
 
-// (Opcional) debug de sensores
+// (Opcional) debug sensores
 app.get("/api/sensors", (req, res) => {
   res.json(Object.values(sensors));
+});
+
+// (Opcional) ver contadores internos (debug)
+app.get("/api/debug/counters", (req, res) => {
+  res.json(storeCounters);
 });
 
 // --------------------------------------------------------------
