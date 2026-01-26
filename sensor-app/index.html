@@ -5,11 +5,14 @@
   <title>Panel de Contador de Personas - Tiendas</title>
   <link rel="stylesheet" href="style.css" />
 </head>
+
 <body>
   <header>
     <img src="logo.png" alt="logo" class="logo">
-    <h1>Panel de personas en tiendas comerciales</h1>
-    <p>Contador en tiempo real de entradas y salidas por tienda.</p>
+    <div class="header-text">
+      <h1>Panel de personas en tiendas comerciales</h1>
+      <p>Contador en tiempo real de entradas y salidas por tienda.</p>
+    </div>
   </header>
 
   <!-- PANEL DE LOGIN (pantalla inicial) -->
@@ -19,20 +22,12 @@
     <div class="login-card">
       <div class="input-group">
         <span class="input-icon">👤</span>
-        <input
-          id="usernameInput"
-          type="text"
-          placeholder="Usuario"
-        />
+        <input id="usernameInput" type="text" placeholder="Usuario" />
       </div>
 
       <div class="input-group">
         <span class="input-icon">🔒</span>
-        <input
-          id="passwordInput"
-          type="password"
-          placeholder="Contraseña"
-        />
+        <input id="passwordInput" type="password" placeholder="Contraseña" />
       </div>
 
       <button id="loginBtn">Entrar</button>
@@ -41,54 +36,119 @@
   </section>
 
   <!-- CONTENIDO PRINCIPAL (se muestra SOLO tras login) -->
-  <main id="mainContent" style="display: none;">
+  <main id="mainContent" class="app-shell" style="display: none;">
 
-    <!-- Barra de usuario: icono + nombre + rol + logout -->
-    <section class="user-bar">
-      <div class="user-left">
-        <!-- app.js escribe aquí: 👤 Vicente (Administrador) o 👤 Arrow (Dueño) -->
-        <span id="userInfo"></span>
+    <!-- MENÚ LATERAL -->
+    <aside class="sidebar">
+      <div class="sidebar-title">Menú</div>
+
+      <button class="nav-btn active" data-view="view-store">🏬 Tienda</button>
+      <button class="nav-btn" data-view="view-charts">📈 Gráficos</button>
+      <button class="nav-btn" data-view="view-calendar">📅 Calendario</button>
+
+      <div class="sidebar-hint">
+        Selecciona una opción para ver los datos.
       </div>
-      <div class="user-right">
-        <button id="logoutBtn" class="logout-btn">Cerrar sesión</button>
-      </div>
-    </section>
+    </aside>
 
-    <!-- Selector de cliente (solo para administradores) -->
-    <section class="client-selector" id="clientSelectorSection" style="display: none;">
-      <h2>Seleccionar cliente</h2>
-      <label>
-        Cliente:
-        <select id="clientSelect"></select>
-      </label>
-    </section>
+    <!-- CONTENIDO DERECHA -->
+    <section class="content">
 
-    <!-- Selector de tienda -->
-    <section class="store-selector" id="storeSelectorSection">
-      <h2>Seleccionar tienda</h2>
-      <label>
-        Tienda:
-        <select id="storeSelect"></select>
-      </label>
-    </section>
+      <!-- Barra de usuario -->
+      <section class="user-bar">
+        <div class="user-left">
+          <span id="userInfo"></span>
+        </div>
+        <div class="user-right">
+          <button id="logoutBtn" class="logout-btn">Cerrar sesión</button>
+        </div>
+      </section>
 
-    <!-- Barra de control -->
-    <section class="toolbar">
-      <button id="refreshBtn">Actualizar ahora</button>
-      <label>
-        Auto-actualizar cada
-        <select id="refreshInterval">
-          <option value="0">No auto</option>
-          <option value="5000">5 s</option>
-          <option value="10000" selected>10 s</option>
-          <option value="30000">30 s</option>
-        </select>
-      </label>
-    </section>
+      <!-- Selector de cliente (solo admin) -->
+      <section class="client-selector" id="clientSelectorSection" style="display: none;">
+        <h2>Seleccionar cliente</h2>
+        <label>
+          Cliente:
+          <select id="clientSelect"></select>
+        </label>
+      </section>
 
-    <!-- Panel principal: contador de personas -->
-    <section id="sensorsContainer">
-      <!-- Aquí se mostrará el resumen de entradas / salidas / dentro -->
+      <!-- Selector de tienda (siempre visible después de login) -->
+      <section class="store-selector" id="storeSelectorSection">
+        <h2>Seleccionar tienda</h2>
+        <label>
+          Tienda:
+          <select id="storeSelect"></select>
+        </label>
+      </section>
+
+      <!-- =========================
+           VISTA 1: TIENDA (contador)
+           ========================= -->
+      <section id="view-store" class="view active-view">
+
+        <!-- Barra de control -->
+        <section class="toolbar">
+          <button id="refreshBtn">Actualizar ahora</button>
+          <label>
+            Auto-actualizar cada
+            <select id="refreshInterval">
+              <option value="0">No auto</option>
+              <option value="5000">5 s</option>
+              <option value="10000" selected>10 s</option>
+              <option value="30000">30 s</option>
+            </select>
+          </label>
+        </section>
+
+        <!-- Panel principal -->
+        <section id="sensorsContainer"></section>
+      </section>
+
+      <!-- =========================
+           VISTA 2: GRÁFICOS
+           ========================= -->
+      <section id="view-charts" class="view">
+        <h2>Gráfico por día</h2>
+        <p class="view-desc">
+          Selecciona una fecha para ver un gráfico simple (entradas vs salidas acumuladas).
+        </p>
+
+        <div class="tool-row">
+          <label>
+            Fecha:
+            <input id="chartDate" type="date" />
+          </label>
+          <button id="loadChartBtn">Cargar gráfico</button>
+        </div>
+
+        <div class="chart-wrap">
+          <canvas id="chartCanvas" width="900" height="320"></canvas>
+        </div>
+      </section>
+
+      <!-- =========================
+           VISTA 3: CALENDARIO / RESUMEN
+           ========================= -->
+      <section id="view-calendar" class="view">
+        <h2>Resumen por día</h2>
+        <p class="view-desc">
+          Selecciona un día para ver el resumen (entradas, salidas, dentro).
+        </p>
+
+        <div class="tool-row">
+          <label>
+            Día:
+            <input id="historyDate" type="date" />
+          </label>
+          <button id="loadHistoryBtn">Ver resumen</button>
+        </div>
+
+        <section id="historyResult" class="history-box">
+          <p>Selecciona una fecha para ver el resumen del día.</p>
+        </section>
+      </section>
+
     </section>
 
     <!-- AVISO DE INACTIVIDAD / POP-UP -->
