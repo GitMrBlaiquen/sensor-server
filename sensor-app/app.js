@@ -1,12 +1,15 @@
 // URL base de la API
 const BASE_URL = window.location.origin;
-// Para pruebas locales, puedes usar:
+// Para pruebas locales:
 // const BASE_URL = "http://localhost:10000";
 
 const LOGIN_URL = `${BASE_URL}/api/login`;
 const COUNTERS_URL = `${BASE_URL}/api/store/counters`;
+const HISTORY_URL = `${BASE_URL}/api/store/history`;
 
+// ------------------------------
 // Elementos principales
+// ------------------------------
 const sensorsContainer = document.getElementById("sensorsContainer");
 const refreshBtn = document.getElementById("refreshBtn");
 const refreshSelect = document.getElementById("refreshInterval");
@@ -37,20 +40,37 @@ const stayLoggedBtn = document.getElementById("stayLoggedBtn");
 const logoutNowBtn = document.getElementById("logoutNowBtn");
 const countdownSpan = document.getElementById("countdownSeconds");
 
+// Menú y vistas (sidebar)
+const navButtons = document.querySelectorAll(".nav-btn");
+const views = document.querySelectorAll(".view");
+
+// Charts / calendar UI
+const chartDate = document.getElementById("chartDate");
+const loadChartBtn = document.getElementById("loadChartBtn");
+const chartCanvas = document.getElementById("chartCanvas");
+const chartCtx = chartCanvas ? chartCanvas.getContext("2d") : null;
+
+const historyDate = document.getElementById("historyDate");
+const loadHistoryBtn = document.getElementById("loadHistoryBtn");
+const historyResult = document.getElementById("historyResult");
+
+// ------------------------------
+// Estado
+// ------------------------------
 let autoRefreshId = null;
 
-// Estado actual
 let currentUser = null;
 let currentRole = null;       // "admin" o "dueño"
 let currentStores = [];       // tiendas asignadas al usuario
 let currentStoreId = null;
 
-// Solo para admin:
-let clients = [];             // [{id: "arrow", name: "Arrow"}, ...]
+// Solo admin
+let clients = [];             // [{id, name}]
 let currentClientId = null;
 
-// ---------------- TIEMPO DE INACTIVIDAD ----------------
-
+// ------------------------------
+// Inactividad
+// ------------------------------
 // 1 minuto sin actividad -> mostrar aviso
 const INACTIVITY_LIMIT_MS = 1 * 60 * 1000;
 // 30 segundos de cuenta regresiva antes de cerrar sesión
@@ -60,12 +80,11 @@ let inactivityTimer = null;
 let logoutTimer = null;
 let countdownInterval = null;
 
-// ------------------------------------
-// Utilidades para clientes / tiendas
-// ------------------------------------
-
+// ------------------------------
+// Utilidades: clientes/tiendas
+// ------------------------------
 function getClientIdFromStoreId(storeId) {
-  const parts = storeId.split("-");
+  const parts = String(storeId || "").split("-");
   return parts[0] || storeId;
 }
 
@@ -77,23 +96,20 @@ function formatClientName(clientId) {
 function buildClientsFromStores(stores) {
   const found = new Set();
   const list = [];
-
-  stores.forEach((store) => {
+  (stores || []).forEach((store) => {
     const clientId = getClientIdFromStoreId(store.id);
     if (!found.has(clientId)) {
       found.add(clientId);
-      list.push({
-        id: clientId,
-        name: formatClientName(clientId),
-      });
+      list.push({ id: clientId, name: formatClientName(clientId) });
     }
   });
-
   return list;
 }
 
 function fillClientSelect() {
+  if (!clientSelect) return;
   clientSelect.innerHTML = "";
+
   clients.forEach((c) => {
     const opt = document.createElement("option");
     opt.value = c.id;
@@ -104,10 +120,13 @@ function fillClientSelect() {
   if (clients.length > 0) {
     currentClientId = clients[0].id;
     clientSelect.value = currentClientId;
+  } else {
+    currentClientId = null;
   }
 }
 
 function fillStoreSelectForClient(clientId) {
+  if (!storeSelect) return;
   storeSelect.innerHTML = "";
 
   const filteredStores = currentStores.filter(
@@ -130,7 +149,9 @@ function fillStoreSelectForClient(clientId) {
 }
 
 function fillStoreSelectSimple() {
+  if (!storeSelect) return;
   storeSelect.innerHTML = "";
+
   currentStores.forEach((store) => {
     const opt = document.createElement("option");
     opt.value = store.id;
@@ -146,16 +167,48 @@ function fillStoreSelectSimple() {
   }
 }
 
-// ------------------------------------
-// INACTIVIDAD: POP-UP Y TIMERS
-// ------------------------------------
+function getStoreName(storeId) {
+  let storeName = storeId;
+  const found = (currentStores || []).find((s) => s.id === storeId);
+  if (found && found.name) storeName = found.name;
+  return storeName;
+}
 
+// ------------------------------
+// Menú lateral: cambiar vista
+// ------------------------------
+function showView(viewId) {
+  views.forEach((v) => v.classList.remove("active-view"));
+  const el = document.getElementById(viewId);
+  if (el) el.classList.add("active-view");
+
+  navButtons.forEach((b) => b.classList.remove("active"));
+  const btn = document.querySelector(`.nav-btn[data-view="${viewId}"]`);
+  if (btn) btn.classList.add("active");
+}
+
+navButtons.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const viewId = btn.dataset.view;
+    if (viewId) showView(viewId);
+  });
+});
+
+// ------------------------------
+// Inactividad: popup y timers
+// ------------------------------
 function clearInactivityTimers() {
   clearTimeout(inactivityTimer);
   clearTimeout(logoutTimer);
   clearInterval(countdownInterval);
   inactivityTimer = null;
   logoutTimer = null;
+  countdownInterval = null;
+}
+
+function hideInactivityWarning() {
+  if (sessionWarningModal) sessionWarningModal.style.display = "none";
+  clearInterval(countdownInterval);
   countdownInterval = null;
 }
 
@@ -175,56 +228,35 @@ function showInactivityWarning() {
     if (countdownSpan) countdownSpan.textContent = remaining;
   }, 1000);
 
-  logoutTimer = setTimeout(() => {
-    logout(); // Usamos el mismo logout general
-  }, WARNING_DURATION_MS);
-}
-
-function hideInactivityWarning() {
-  if (sessionWarningModal) {
-    sessionWarningModal.style.display = "none";
-  }
-  clearInterval(countdownInterval);
-  countdownInterval = null;
+  logoutTimer = setTimeout(() => logout(), WARNING_DURATION_MS);
 }
 
 function resetInactivityTimers() {
-  // Solo tiene sentido si hay usuario logueado
   if (!currentUser) return;
-
   hideInactivityWarning();
   clearInactivityTimers();
-
   inactivityTimer = setTimeout(showInactivityWarning, INACTIVITY_LIMIT_MS);
 }
 
-// Escuchamos actividad global para reiniciar temporizador
+// Actividad global
 ["click", "keydown", "mousemove", "scroll", "touchstart"].forEach((evt) => {
-  document.addEventListener(evt, () => {
-    resetInactivityTimers();
-  });
+  document.addEventListener(evt, () => resetInactivityTimers(), { passive: true });
 });
 
-// Botones del pop-up
+// Botones del popup
 if (stayLoggedBtn) {
-  stayLoggedBtn.addEventListener("click", () => {
-    resetInactivityTimers();
-  });
+  stayLoggedBtn.addEventListener("click", () => resetInactivityTimers());
 }
-
 if (logoutNowBtn) {
-  logoutNowBtn.addEventListener("click", () => {
-    logout();
-  });
+  logoutNowBtn.addEventListener("click", () => logout());
 }
 
-// ------------------------------------
-// LOGIN
-// ------------------------------------
-
+// ------------------------------
+// Login
+// ------------------------------
 async function login() {
-  const username = usernameInput.value.trim();
-  const password = passwordInput.value.trim();
+  const username = (usernameInput?.value || "").trim();
+  const password = (passwordInput?.value || "").trim();
 
   if (!username || !password) {
     loginStatus.textContent = "Ingresa usuario y contraseña.";
@@ -238,20 +270,17 @@ async function login() {
 
     const res = await fetch(LOGIN_URL, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password }),
     });
 
     if (!res.ok) {
-      if (res.status === 401) {
-        throw new Error("Usuario o contraseña incorrectos.");
-      }
+      if (res.status === 401) throw new Error("Usuario o contraseña incorrectos.");
       throw new Error("Error en el login.");
     }
 
     const data = await res.json();
+
     currentUser = data.username;
     currentRole = data.role || "dueño";
     currentStores = data.stores || [];
@@ -262,6 +291,7 @@ async function login() {
       return;
     }
 
+    // Barra usuario
     if (userInfo) {
       const roleLabel = currentRole === "admin" ? "Administrador" : "Dueño";
       userInfo.innerHTML = `
@@ -271,35 +301,46 @@ async function login() {
       `;
     }
 
+    // Selectores admin/dueño
     if (currentRole === "admin") {
       clients = buildClientsFromStores(currentStores);
       if (clients.length > 0) {
         fillClientSelect();
         fillStoreSelectForClient(currentClientId);
-        clientSelectorSection.style.display = "block";
+
+        if (clientSelectorSection) clientSelectorSection.style.display = "block";
       } else {
-        clientSelectorSection.style.display = "none";
+        if (clientSelectorSection) clientSelectorSection.style.display = "none";
         fillStoreSelectSimple();
       }
     } else {
       clients = [];
       currentClientId = null;
-      clientSelectorSection.style.display = "none";
+      if (clientSelectorSection) clientSelectorSection.style.display = "none";
       fillStoreSelectSimple();
     }
 
+    // Mostrar contenido
     loginStatus.textContent = "";
-    loginPanel.style.display = "none";
-    mainContent.style.display = "block";
+    if (loginPanel) loginPanel.style.display = "none";
+    if (mainContent) mainContent.style.display = "block";
 
-    // Iniciar control de inactividad
+    // Vista inicial
+    showView("view-store");
+
+    // Fechas por defecto (hoy)
+    const today = new Date().toISOString().slice(0, 10);
+    if (chartDate && !chartDate.value) chartDate.value = today;
+    if (historyDate && !historyDate.value) historyDate.value = today;
+
+    // Inactividad
     resetInactivityTimers();
 
+    // Cargar contador inicial
     if (currentStoreId) {
       loadSensors();
     } else {
-      sensorsContainer.innerHTML =
-        "<p>No hay tiendas disponibles para este usuario.</p>";
+      sensorsContainer.innerHTML = "<p>No hay tiendas disponibles para este usuario.</p>";
     }
   } catch (err) {
     console.error(err);
@@ -309,25 +350,19 @@ async function login() {
 }
 
 // Eventos login
-loginBtn.addEventListener("click", login);
-usernameInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") login();
-});
-passwordInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") login();
-});
+if (loginBtn) loginBtn.addEventListener("click", login);
+if (usernameInput) usernameInput.addEventListener("keydown", (e) => e.key === "Enter" && login());
+if (passwordInput) passwordInput.addEventListener("keydown", (e) => e.key === "Enter" && login());
 
-// ------------------------------------
-// LOGOUT
-// ------------------------------------
-
+// ------------------------------
+// Logout
+// ------------------------------
 function logout() {
   if (autoRefreshId) {
     clearInterval(autoRefreshId);
     autoRefreshId = null;
   }
 
-  // Limpiar timers de inactividad y ocultar pop-up
   clearInactivityTimers();
   hideInactivityWarning();
 
@@ -339,51 +374,56 @@ function logout() {
   currentClientId = null;
 
   if (userInfo) userInfo.textContent = "";
-  storeSelect.innerHTML = "";
-  clientSelect.innerHTML = "";
-  clientSelectorSection.style.display = "none";
+  if (storeSelect) storeSelect.innerHTML = "";
+  if (clientSelect) clientSelect.innerHTML = "";
+  if (clientSelectorSection) clientSelectorSection.style.display = "none";
 
-  sensorsContainer.innerHTML =
-    "<p>Inicia sesión para ver el contador de personas.</p>";
+  if (sensorsContainer) sensorsContainer.innerHTML = "<p>Inicia sesión para ver el contador de personas.</p>";
 
-  loginStatus.textContent = "";
-  usernameInput.value = "";
-  passwordInput.value = "";
+  if (historyResult) historyResult.innerHTML = "<p>Selecciona una fecha para ver el resumen del día.</p>";
+  if (chartCtx && chartCanvas) chartCtx.clearRect(0, 0, chartCanvas.width, chartCanvas.height);
 
-  mainContent.style.display = "none";
-  loginPanel.style.display = "block";
+  if (loginStatus) loginStatus.textContent = "";
+  if (usernameInput) usernameInput.value = "";
+  if (passwordInput) passwordInput.value = "";
+
+  if (mainContent) mainContent.style.display = "none";
+  if (loginPanel) loginPanel.style.display = "flex"; // tu login está centrado por CSS
 }
 
-logoutBtn.addEventListener("click", logout);
+if (logoutBtn) logoutBtn.addEventListener("click", logout);
 
-// ------------------------------------
-// SELECTORES (cliente y tienda)
-// ------------------------------------
+// ------------------------------
+// Selectores
+// ------------------------------
+if (clientSelect) {
+  clientSelect.addEventListener("change", () => {
+    currentClientId = clientSelect.value;
+    fillStoreSelectForClient(currentClientId);
 
-clientSelect.addEventListener("change", () => {
-  currentClientId = clientSelect.value;
-  fillStoreSelectForClient(currentClientId);
-  if (currentStoreId) {
+    if (currentStoreId) loadSensors();
+    else sensorsContainer.innerHTML = "<p>No hay tiendas asociadas a este cliente.</p>";
+  });
+}
+
+if (storeSelect) {
+  storeSelect.addEventListener("change", () => {
+    currentStoreId = storeSelect.value;
+
+    // si estás viendo tienda, refresca el contador
     loadSensors();
-  } else {
-    sensorsContainer.innerHTML =
-      "<p>No hay tiendas asociadas a este cliente.</p>";
-  }
-});
 
-storeSelect.addEventListener("change", () => {
-  currentStoreId = storeSelect.value;
-  loadSensors();
-});
+    // si estás en charts/calendar, no lo fuerzo automáticamente,
+    // pero si quieres, podemos hacerlo.
+  });
+}
 
-// ------------------------------------
-// CONTADOR TIENDA (ENTRADAS / SALIDAS)
-// ------------------------------------
-
+// ------------------------------
+// Contador TIENDA (actual)
+// ------------------------------
 async function loadSensors() {
   if (!currentStoreId) {
-    sensorsContainer.innerHTML =
-      "<p>Selecciona una tienda para ver los datos.</p>";
+    sensorsContainer.innerHTML = "<p>Selecciona una tienda para ver los datos.</p>";
     return;
   }
 
@@ -392,9 +432,7 @@ async function loadSensors() {
 
     const url = `${COUNTERS_URL}?storeId=${encodeURIComponent(currentStoreId)}`;
     const res = await fetch(url);
-    if (!res.ok) {
-      throw new Error("Error al obtener los contadores: " + res.status);
-    }
+    if (!res.ok) throw new Error("Error al obtener los contadores: " + res.status);
 
     const data = await res.json();
     renderStoreCounters(data);
@@ -412,17 +450,13 @@ function renderStoreCounters(counters) {
   }
 
   const { storeId, entradas = 0, salidas = 0, dentro = 0 } = counters;
-
   sensorsContainer.innerHTML = "";
 
   const card = document.createElement("article");
   card.className = "sensor-card";
 
   const nowStr = new Date().toLocaleTimeString();
-
-  let storeName = storeId;
-  const found = currentStores.find((s) => s.id === storeId);
-  if (found && found.name) storeName = found.name;
+  const storeName = getStoreName(storeId);
 
   card.innerHTML = `
     <div class="sensor-header">
@@ -453,30 +487,172 @@ function renderStoreCounters(counters) {
   sensorsContainer.appendChild(card);
 }
 
-// ------------------------------------
-// CONTROLES GENERALES
-// ------------------------------------
+// ------------------------------
+// Historial (por día) + gráfico
+// ------------------------------
+async function fetchHistory(dateStr) {
+  if (!currentStoreId) throw new Error("No hay tienda seleccionada.");
+  if (!dateStr) throw new Error("Selecciona una fecha.");
 
-refreshBtn.addEventListener("click", () => {
-  loadSensors();
-});
+  const url = `${HISTORY_URL}?storeId=${encodeURIComponent(currentStoreId)}&date=${encodeURIComponent(dateStr)}`;
+  const res = await fetch(url);
 
-refreshSelect.addEventListener("change", () => {
-  const interval = Number(refreshSelect.value);
+  if (!res.ok) throw new Error("No se pudo obtener historial: " + res.status);
+  return res.json();
+}
 
-  if (autoRefreshId) {
-    clearInterval(autoRefreshId);
-    autoRefreshId = null;
+async function loadHistory() {
+  if (!historyResult) return;
+
+  try {
+    historyResult.innerHTML = "<p>Cargando historial...</p>";
+    const dateStr = historyDate?.value;
+    const data = await fetchHistory(dateStr);
+
+    const entradas = Number(data.entradas || 0);
+    const salidas = Number(data.salidas || 0);
+    const dentro = Math.max(entradas - salidas, 0);
+
+    const storeName = getStoreName(data.storeId);
+
+    historyResult.innerHTML = `
+      <h3>${storeName} — ${data.date}</h3>
+      <p><strong>Entradas:</strong> ${entradas}</p>
+      <p><strong>Salidas:</strong> ${salidas}</p>
+      <p><strong>Dentro (estimado):</strong> ${dentro}</p>
+    `;
+  } catch (e) {
+    historyResult.innerHTML = `<p style="color:red;">${e.message}</p>`;
   }
+}
 
-  if (interval > 0) {
-    autoRefreshId = setInterval(() => {
-      loadSensors();
-    }, interval);
+async function loadChart() {
+  if (!chartCtx || !chartCanvas) return;
+
+  try {
+    // Limpiar
+    chartCtx.clearRect(0, 0, chartCanvas.width, chartCanvas.height);
+
+    const dateStr = chartDate?.value;
+    const data = await fetchHistory(dateStr);
+    drawSimpleChart(data.byHour || {}, dateStr);
+  } catch (e) {
+    chartCtx.clearRect(0, 0, chartCanvas.width, chartCanvas.height);
+    chartCtx.fillStyle = "#0A2342";
+    chartCtx.font = "16px system-ui";
+    chartCtx.fillText("No se pudo cargar el gráfico.", 20, 40);
   }
-});
+}
+
+function drawSimpleChart(byHour, dateStr) {
+  const W = chartCanvas.width;
+  const H = chartCanvas.height;
+
+  chartCtx.clearRect(0, 0, W, H);
+
+  // Horas 00..23
+  const hours = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
+
+  // Acumulado por hora
+  let accE = 0;
+  let accS = 0;
+  const pointsE = [];
+  const pointsS = [];
+
+  hours.forEach((h) => {
+    const item = byHour[h] || { entradas: 0, salidas: 0 };
+    accE += Number(item.entradas || 0);
+    accS += Number(item.salidas || 0);
+    pointsE.push(accE);
+    pointsS.push(accS);
+  });
+
+  const maxY = Math.max(1, ...pointsE, ...pointsS);
+
+  // Márgenes
+  const padL = 50, padR = 15, padT = 20, padB = 45;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+
+  // Ejes
+  chartCtx.strokeStyle = "rgba(0,0,0,0.25)";
+  chartCtx.lineWidth = 1;
+  chartCtx.beginPath();
+  chartCtx.moveTo(padL, padT);
+  chartCtx.lineTo(padL, padT + plotH);
+  chartCtx.lineTo(padL + plotW, padT + plotH);
+  chartCtx.stroke();
+
+  // Etiquetas simples en Y
+  chartCtx.fillStyle = "#0A2342";
+  chartCtx.font = "12px system-ui";
+  chartCtx.fillText(String(maxY), 10, padT + 5);
+  chartCtx.fillText("0", 22, padT + plotH);
+
+  // Helpers
+  const xAt = (i) => padL + (i / 23) * plotW;
+  const yAt = (v) => padT + plotH - (v / maxY) * plotH;
+
+  // Línea Entradas
+  chartCtx.strokeStyle = "#1C6DD0";
+  chartCtx.lineWidth = 2;
+  chartCtx.beginPath();
+  pointsE.forEach((v, i) => {
+    const x = xAt(i);
+    const y = yAt(v);
+    if (i === 0) chartCtx.moveTo(x, y);
+    else chartCtx.lineTo(x, y);
+  });
+  chartCtx.stroke();
+
+  // Línea Salidas
+  chartCtx.strokeStyle = "#c0392b";
+  chartCtx.lineWidth = 2;
+  chartCtx.beginPath();
+  pointsS.forEach((v, i) => {
+    const x = xAt(i);
+    const y = yAt(v);
+    if (i === 0) chartCtx.moveTo(x, y);
+    else chartCtx.lineTo(x, y);
+  });
+  chartCtx.stroke();
+
+  // Leyenda
+  chartCtx.fillStyle = "#0A2342";
+  chartCtx.font = "14px system-ui";
+  const storeName = getStoreName(currentStoreId);
+  chartCtx.fillText(`${storeName} — ${dateStr} (acumulado por hora)`, padL, H - 20);
+  chartCtx.font = "13px system-ui";
+  chartCtx.fillText("Azul: Entradas | Rojo: Salidas", padL, H - 5);
+}
+
+// Botones historial / chart
+if (loadHistoryBtn) loadHistoryBtn.addEventListener("click", loadHistory);
+if (loadChartBtn) loadChartBtn.addEventListener("click", loadChart);
+
+// ------------------------------
+// Controles generales (tienda)
+// ------------------------------
+if (refreshBtn) {
+  refreshBtn.addEventListener("click", () => loadSensors());
+}
+
+if (refreshSelect) {
+  refreshSelect.addEventListener("change", () => {
+    const interval = Number(refreshSelect.value);
+
+    if (autoRefreshId) {
+      clearInterval(autoRefreshId);
+      autoRefreshId = null;
+    }
+
+    if (interval > 0) {
+      autoRefreshId = setInterval(() => loadSensors(), interval);
+    }
+  });
+}
 
 // Mensaje inicial
-sensorsContainer.innerHTML =
-  "<p>Inicia sesión para ver el contador de personas.</p>";
-
+if (sensorsContainer) {
+  sensorsContainer.innerHTML = "<p>Inicia sesión para ver el contador de personas.</p>";
+}
