@@ -209,6 +209,22 @@ function normalizeCounts(body) {
   return { entradas, salidas };
 }
 
+// ---------------- DISPLAY POR SN (para pantallas demo) ----------------
+// GET /api/display?sn=221000002507152508
+app.get("/api/display", (req, res) => {
+  const sn = String(req.query.sn || "");
+  if (!sn) return res.status(400).json({ error: "Falta sn" });
+
+  const storeId = getStoreIdFromDevice(sn);
+  if (!storeId) return res.status(404).json({ error: "SN no mapeado", sn });
+
+  ensureStore(storeId);
+  const { entradas, salidas } = storeCounters[storeId];
+  const dentro = Math.max(entradas - salidas, 0);
+
+  res.json({ sn, storeId, entradas, salidas, dentro });
+});
+
 // --------------------------------------------------------------
 // 1) ENDPOINT “ANTIGUO” (simulador)
 // --------------------------------------------------------------
@@ -346,3 +362,4 @@ const PORT = process.env.PORT || 10000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Servidor TIENDAS activo en el puerto ${PORT}`);
 });
+
