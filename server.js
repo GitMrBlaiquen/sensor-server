@@ -16,7 +16,7 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "sensor-app", "index.html"));
 });
 
-// Health (útil para probar en Render)
+// Health (útil para Render)
 app.get("/health", (req, res) => {
   res.json({ ok: true, time: new Date().toISOString() });
 });
@@ -24,7 +24,6 @@ app.get("/health", (req, res) => {
 // --------------------------------------------------------------
 // ---------   MODELO EN MEMORIA: USUARIOS Y TIENDAS   ----------
 // --------------------------------------------------------------
-
 const stores = {
   "arrow-01": { id: "arrow-01", name: "Tienda Arrow 01" },
   "arrow-02": { id: "arrow-02", name: "Tienda Arrow 02" },
@@ -76,7 +75,7 @@ app.post("/api/login", (req, res) => {
     return res.status(401).json({ error: "Usuario o contraseña inválidos" });
   }
 
-  const userStores = user.stores.map((id) => stores[id]).filter(Boolean);
+  const userStores = (user.stores || []).map((id) => stores[id]).filter(Boolean);
 
   return res.json({
     username: user.username,
@@ -89,94 +88,95 @@ app.post("/api/login", (req, res) => {
 // -----------   CONTADOR + HISTORIAL POR TIENDA   --------------
 // --------------------------------------------------------------
 
-// debug: últimos payloads por sensor
+// Debug: últimos payloads por sensor
 const sensors = {};
 
-// contadores “en vivo”
+// Contadores “en vivo”
 const storeCounters = {}; // { storeId: { entradas, salidas } }
 
-// historial diario (resumen)
+// Historial por día (resumen)
 const dailyCounters = {}; // { storeId: { "YYYY-MM-DD": { entradas, salidas } } }
 
-// serie para gráfico (puntos por día)
-const dailySeries = {}; // { storeId: { "YYYY-MM-DD": [ {ts, entradas, salidas, dentro, deltaE, deltaS} ] } }
-
-// límites para no explotar memoria
-const MAX_POINTS_PER_DAY = 2000;
-
-// helpers
-function ensureStore(storeId) {
-  if (!storeCounters[storeId]) storeCounters[storeId] = { entradas: 0, salidas: 0 };
-  if (!dailyCounters[storeId]) dailyCounters[storeId] = {};
-  if (!dailySeries[storeId]) dailySeries[storeId] = {};
-}
+// Historial por hora del día (para gráfico)
+const hourlyCounters = {}; 
+// { storeId: { "YYYY-MM-DD": { "00":{entradas,salidas}, ..., "23":{entradas,salidas} } } }
 
 function safeNumber(v, fallback = 0) {
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
 }
 
-function todayKey() {
-  // YYYY-MM-DD en hora local del servidor
-  const d = new Date();
+function ensureStore(storeId) {
+  if (!storeCounters[storeId]) storeCounters[storeId] = { entradas: 0, salidas: 0 };
+  if (!dailyCounters[storeId]) dailyCounters[storeId] = {};
+  if (!hourlyCounters[storeId]) hourlyCounters[storeId] = {};
+}
+
+function ensureDay(storeId, dateKey) {
+  ensureStore(storeId);
+
+  if (!dailyCounters[storeId][dateKey]) {
+    dailyCounters[storeId][dateKey] = { entradas: 0, salidas: 0 };
+  }
+
+  if (!hourlyCounters[storeId][dateKey]) {
+    hourlyCounters[storeId][dateKey] = {};
+    for (let h = 0; h < 24; h++) {
+      const hh = String(h).padStart(2, "0");
+      hourlyCounters[storeId][dateKey][hh] = { entradas: 0, salidas: 0 };
+    }
+  }
+}
+
+function dateKeyFromTs(ts = Date.now()) {
+  const d = new Date(ts);
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
 
-function ensureDay(storeId, dateKey) {
-  ensureStore(storeId);
-  if (!dailyCounters[storeId][dateKey]) dailyCounters[storeId][dateKey] = { entradas: 0, salidas: 0 };
-  if (!dailySeries[storeId][dateKey]) dailySeries[storeId][dateKey] = [];
+function hourKeyFromTs(ts = Date.now()) {
+  const d = new Date(ts);
+  return String(d.getHours()).padStart(2, "0");
 }
 
-function addDelta(storeId, deltaEntradas, deltaSalidas, meta = {}) {
-  const e = safeNumber(deltaEntradas, 0);
-  const s = safeNumber(deltaSalidas, 0);
+function addDelta(storeId, deltaE, deltaS, ts = Date.now()) {
+  const e = safeNumber(deltaE, 0);
+  const s = safeNumber(deltaS, 0);
 
   ensureStore(storeId);
 
-  // 1) vivo
+  // vivo
   storeCounters[storeId].entradas += e;
   storeCounters[storeId].salidas += s;
 
-  // 2) diario
-  const dateKey = meta.dateKey || todayKey();
+  // diario + hora
+  const dateKey = dateKeyFromTs(ts);
+  const hourKey = hourKeyFromTs(ts);
+
   ensureDay(storeId, dateKey);
+
   dailyCounters[storeId][dateKey].entradas += e;
   dailyCounters[storeId][dateKey].salidas += s;
 
-  // 3) serie
-  const entradasTotal = dailyCounters[storeId][dateKey].entradas;
-  const salidasTotal = dailyCounters[storeId][dateKey].salidas;
-  const dentro = Math.max(entradasTotal - salidasTotal, 0);
+  hourlyCounters[storeId][dateKey][hourKey].entradas += e;
+  hourlyCounters[storeId][dateKey][hourKey].salidas += s;
 
-  const arr = dailySeries[storeId][dateKey];
-  arr.push({
-    ts: Date.now(),
-    entradas: entradasTotal,
-    salidas: salidasTotal,
-    dentro,
-    deltaE: e,
-    deltaS: s,
-  });
+  const entradasDia = dailyCounters[storeId][dateKey].entradas;
+  const salidasDia = dailyCounters[storeId][dateKey].salidas;
+  const dentroDia = Math.max(entradasDia - salidasDia, 0);
 
-  if (arr.length > MAX_POINTS_PER_DAY) {
-    arr.splice(0, arr.length - MAX_POINTS_PER_DAY);
-  }
-
-  return { dateKey, entradasTotal, salidasTotal, dentro };
+  return { dateKey, hourKey, entradasDia, salidasDia, dentroDia };
 }
 
 // --------------------------------------------------------------
 // MAPEO: 1 SENSOR REAL (SN) = 1 TIENDA
 // --------------------------------------------------------------
 const DEVICE_TO_STORE = {
-  // ⚠️ Asegúrate que sea EXACTO a lo que llega como body.sn
+  // ⚠️ Debe ser EXACTO a lo que llega como body.sn
   "221000002507152508": "arrow-01",
-  // agrega más cuando conectes otros sensores:
-  // "SN_DE_OTRO_SENSOR": "arrow-02",
+  // "SN_OTRO": "arrow-02",
 };
 
 function getStoreIdFromDevice(sn) {
@@ -196,15 +196,16 @@ function okSensor(res, extraData = {}) {
 }
 
 function normalizeCounts(body) {
-  // nombres típicos
   const entradas = safeNumber(
     body.in ?? body.enter ?? body.Enter ?? body.In ?? body.inNum ?? body.InNum ?? 0,
     0
   );
+
   const salidas = safeNumber(
     body.out ?? body.leave ?? body.Leave ?? body.Out ?? body.outNum ?? body.OutNum ?? 0,
     0
   );
+
   return { entradas, salidas };
 }
 
@@ -216,8 +217,6 @@ app.post("/api/sensors/data", (req, res) => {
 
   if (!storeId) return res.status(400).json({ error: "Falta storeId" });
   if (!deviceId) return res.status(400).json({ error: "Falta deviceId" });
-
-  ensureStore(storeId);
 
   const safeValue = safeNumber(value, 1);
   const now = new Date();
@@ -238,9 +237,9 @@ app.post("/api/sensors/data", (req, res) => {
   if (type === "entrada") dE = safeValue;
   else if (type === "salida") dS = safeValue;
 
-  const result = addDelta(storeId, dE, dS);
+  const result = addDelta(storeId, dE, dS, Date.now());
 
-  console.log("🧪 Simulador:", sensors[sensorKey], "=>", result);
+  console.log("🧪 Simulador:", sensorKey, "=>", result);
   return res.json({ status: "ok" });
 });
 
@@ -255,6 +254,7 @@ app.post("/api/camera/heartBeat", (req, res) => {
 
   console.log("❤️ heartBeat:", { from: req.ip, sn });
 
+  // Ajustable: cada cuántos minutos manda data
   return okSensor(res, { uploadInterval: 1, dataMode: "Add" });
 });
 
@@ -265,30 +265,11 @@ app.post("/api/camera/dataUpload", (req, res) => {
 
   console.log("📦 dataUpload:", { from: req.ip, sn, storeId });
 
-  if (!storeId) {
-    console.warn("⚠️ SN no mapeado a tienda. Agrega en DEVICE_TO_STORE:", sn);
-
-    sensors[`unknown:SN:${sn || "no-sn"}`] = {
-      storeId: null,
-      deviceId: `SN:${sn || "no-sn"}`,
-      type: "sensor-real",
-      value: null,
-      unit: "",
-      extra: body,
-      lastUpdate: new Date(),
-    };
-
-    return okSensor(res);
-  }
-
-  ensureStore(storeId);
-
-  const { entradas, salidas } = normalizeCounts(body);
-
-  // guardar debug del payload
-  sensors[`${storeId}:SN:${sn}`] = {
-    storeId,
-    deviceId: `SN:${sn}`,
+  // Guardar debug del payload siempre
+  const sensorKey = `${storeId || "unknown"}:SN:${sn || "no-sn"}`;
+  sensors[sensorKey] = {
+    storeId: storeId || null,
+    deviceId: `SN:${sn || "no-sn"}`,
     type: "sensor-real",
     value: null,
     unit: "",
@@ -296,9 +277,17 @@ app.post("/api/camera/dataUpload", (req, res) => {
     lastUpdate: new Date(),
   };
 
-  const result = addDelta(storeId, entradas, salidas);
+  if (!storeId) {
+    console.warn("⚠️ SN no mapeado. Agrégalo en DEVICE_TO_STORE:", sn);
+    return okSensor(res);
+  }
 
-  console.log(`✅ ${storeId} (SN ${sn}) -> +E ${entradas}, +S ${salidas} =>`, result);
+  const { entradas, salidas } = normalizeCounts(body);
+
+  // IMPORTANTE: asumimos que el sensor manda DELTAS (lo normal en “Add”).
+  const result = addDelta(storeId, entradas, salidas, Date.now());
+
+  console.log(`✅ ${storeId} (SN ${sn}) +E ${entradas} +S ${salidas} =>`, result);
   return okSensor(res);
 });
 
@@ -306,7 +295,7 @@ app.post("/api/camera/dataUpload", (req, res) => {
 // ------------------------   CONSULTAS WEB   -------------------
 // --------------------------------------------------------------
 
-// contador “en vivo”
+// Contador “en vivo”
 app.get("/api/store/counters", (req, res) => {
   const { storeId } = req.query;
   if (!storeId) return res.status(400).json({ error: "Falta storeId en la query" });
@@ -318,51 +307,39 @@ app.get("/api/store/counters", (req, res) => {
   res.json({ storeId, entradas, salidas, dentro });
 });
 
-// días con historial (calendario)
+// Días con datos (para calendario si luego quieres “marcar” días)
 app.get("/api/store/days", (req, res) => {
   const { storeId } = req.query;
   if (!storeId) return res.status(400).json({ error: "Falta storeId en la query" });
 
   ensureStore(storeId);
-  const days = Object.keys(dailyCounters[storeId] || {}).sort(); // YYYY-MM-DD
+  const days = Object.keys(dailyCounters[storeId] || {}).sort();
   res.json({ storeId, days });
 });
 
-// resumen del día (calendario)
+// Resumen del día + byHour (esto lo usa tu app.js para gráfico)
 app.get("/api/store/history", (req, res) => {
   const { storeId, date } = req.query;
   if (!storeId) return res.status(400).json({ error: "Falta storeId en la query" });
   if (!date) return res.status(400).json({ error: "Falta date=YYYY-MM-DD" });
 
-  ensureStore(storeId);
   ensureDay(storeId, date);
 
   const { entradas, salidas } = dailyCounters[storeId][date];
   const dentro = Math.max(entradas - salidas, 0);
 
-  res.json({ storeId, date, entradas, salidas, dentro });
+  // byHour: { "00":{entradas,salidas}, ... }
+  const byHour = hourlyCounters[storeId][date] || {};
+
+  res.json({ storeId, date, entradas, salidas, dentro, byHour });
 });
 
-// serie del día (para gráfico simple)
-app.get("/api/store/series", (req, res) => {
-  const { storeId, date } = req.query;
-  if (!storeId) return res.status(400).json({ error: "Falta storeId en la query" });
-  if (!date) return res.status(400).json({ error: "Falta date=YYYY-MM-DD" });
-
-  ensureStore(storeId);
-  ensureDay(storeId, date);
-
-  res.json({
-    storeId,
-    date,
-    points: dailySeries[storeId][date] || [],
-  });
-});
-
+// Debug / utilidades
 app.get("/api/stores", (req, res) => res.json(Object.values(stores)));
 app.get("/api/sensors", (req, res) => res.json(Object.values(sensors)));
 app.get("/api/debug/counters", (req, res) => res.json(storeCounters));
 app.get("/api/debug/daily", (req, res) => res.json(dailyCounters));
+app.get("/api/debug/hourly", (req, res) => res.json(hourlyCounters));
 
 // ---------------- START ----------------
 const PORT = process.env.PORT || 10000;
