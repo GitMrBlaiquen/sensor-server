@@ -1,6 +1,5 @@
 // URL base de la API
 const BASE_URL = window.location.origin;
-// Para pruebas locales:
 // const BASE_URL = "http://localhost:10000";
 
 const LOGIN_URL = `${BASE_URL}/api/login`;
@@ -31,7 +30,6 @@ const clientSelectorSection = document.getElementById("clientSelectorSection");
 const clientSelect = document.getElementById("clientSelect");
 
 // Selector de tienda
-const storeSelectorSection = document.getElementById("storeSelectorSection");
 const storeSelect = document.getElementById("storeSelect");
 
 // Modal de inactividad
@@ -40,7 +38,7 @@ const stayLoggedBtn = document.getElementById("stayLoggedBtn");
 const logoutNowBtn = document.getElementById("logoutNowBtn");
 const countdownSpan = document.getElementById("countdownSeconds");
 
-// Menú y vistas (sidebar)
+// Menú y vistas
 const navButtons = document.querySelectorAll(".nav-btn");
 const views = document.querySelectorAll(".view");
 
@@ -61,20 +59,18 @@ let autoRefreshId = null;
 
 let currentUser = null;
 let currentRole = null;       // "admin" o "dueño"
-let currentStores = [];       // tiendas asignadas al usuario
+let currentStores = [];
 let currentStoreId = null;
 
 // Solo admin
-let clients = [];             // [{id, name}]
+let clients = [];
 let currentClientId = null;
 
 // ------------------------------
 // Inactividad
 // ------------------------------
-// 1 minuto sin actividad -> mostrar aviso
-const INACTIVITY_LIMIT_MS = 1 * 60 * 1000;
-// 30 segundos de cuenta regresiva antes de cerrar sesión
-const WARNING_DURATION_MS = 30 * 1000;
+const INACTIVITY_LIMIT_MS = 1 * 60 * 1000;  // 1 minuto
+const WARNING_DURATION_MS = 30 * 1000;      // 30 segundos
 
 let inactivityTimer = null;
 let logoutTimer = null;
@@ -195,7 +191,7 @@ navButtons.forEach((btn) => {
 });
 
 // ------------------------------
-// Inactividad: popup y timers
+// Inactividad
 // ------------------------------
 function clearInactivityTimers() {
   clearTimeout(inactivityTimer);
@@ -238,18 +234,12 @@ function resetInactivityTimers() {
   inactivityTimer = setTimeout(showInactivityWarning, INACTIVITY_LIMIT_MS);
 }
 
-// Actividad global
 ["click", "keydown", "mousemove", "scroll", "touchstart"].forEach((evt) => {
   document.addEventListener(evt, () => resetInactivityTimers(), { passive: true });
 });
 
-// Botones del popup
-if (stayLoggedBtn) {
-  stayLoggedBtn.addEventListener("click", () => resetInactivityTimers());
-}
-if (logoutNowBtn) {
-  logoutNowBtn.addEventListener("click", () => logout());
-}
+if (stayLoggedBtn) stayLoggedBtn.addEventListener("click", () => resetInactivityTimers());
+if (logoutNowBtn) logoutNowBtn.addEventListener("click", () => logout());
 
 // ------------------------------
 // Login
@@ -291,7 +281,6 @@ async function login() {
       return;
     }
 
-    // Barra usuario
     if (userInfo) {
       const roleLabel = currentRole === "admin" ? "Administrador" : "Dueño";
       userInfo.innerHTML = `
@@ -301,13 +290,11 @@ async function login() {
       `;
     }
 
-    // Selectores admin/dueño
     if (currentRole === "admin") {
       clients = buildClientsFromStores(currentStores);
       if (clients.length > 0) {
         fillClientSelect();
         fillStoreSelectForClient(currentClientId);
-
         if (clientSelectorSection) clientSelectorSection.style.display = "block";
       } else {
         if (clientSelectorSection) clientSelectorSection.style.display = "none";
@@ -320,28 +307,20 @@ async function login() {
       fillStoreSelectSimple();
     }
 
-    // Mostrar contenido
     loginStatus.textContent = "";
     if (loginPanel) loginPanel.style.display = "none";
     if (mainContent) mainContent.style.display = "block";
 
-    // Vista inicial
     showView("view-store");
 
-    // Fechas por defecto (hoy)
     const today = new Date().toISOString().slice(0, 10);
     if (chartDate && !chartDate.value) chartDate.value = today;
     if (historyDate && !historyDate.value) historyDate.value = today;
 
-    // Inactividad
     resetInactivityTimers();
 
-    // Cargar contador inicial
-    if (currentStoreId) {
-      loadSensors();
-    } else {
-      sensorsContainer.innerHTML = "<p>No hay tiendas disponibles para este usuario.</p>";
-    }
+    if (currentStoreId) loadSensors();
+    else sensorsContainer.innerHTML = "<p>No hay tiendas disponibles para este usuario.</p>";
   } catch (err) {
     console.error(err);
     loginStatus.textContent = err.message || "No se pudo iniciar sesión.";
@@ -349,7 +328,6 @@ async function login() {
   }
 }
 
-// Eventos login
 if (loginBtn) loginBtn.addEventListener("click", login);
 if (usernameInput) usernameInput.addEventListener("keydown", (e) => e.key === "Enter" && login());
 if (passwordInput) passwordInput.addEventListener("keydown", (e) => e.key === "Enter" && login());
@@ -379,7 +357,6 @@ function logout() {
   if (clientSelectorSection) clientSelectorSection.style.display = "none";
 
   if (sensorsContainer) sensorsContainer.innerHTML = "<p>Inicia sesión para ver el contador de personas.</p>";
-
   if (historyResult) historyResult.innerHTML = "<p>Selecciona una fecha para ver el resumen del día.</p>";
   if (chartCtx && chartCanvas) chartCtx.clearRect(0, 0, chartCanvas.width, chartCanvas.height);
 
@@ -388,7 +365,7 @@ function logout() {
   if (passwordInput) passwordInput.value = "";
 
   if (mainContent) mainContent.style.display = "none";
-  if (loginPanel) loginPanel.style.display = "flex"; // tu login está centrado por CSS
+  if (loginPanel) loginPanel.style.display = "flex"; // importante: mantener centrado
 }
 
 if (logoutBtn) logoutBtn.addEventListener("click", logout);
@@ -409,17 +386,12 @@ if (clientSelect) {
 if (storeSelect) {
   storeSelect.addEventListener("change", () => {
     currentStoreId = storeSelect.value;
-
-    // si estás viendo tienda, refresca el contador
     loadSensors();
-
-    // si estás en charts/calendar, no lo fuerzo automáticamente,
-    // pero si quieres, podemos hacerlo.
   });
 }
 
 // ------------------------------
-// Contador TIENDA (actual)
+// Contador TIENDA
 // ------------------------------
 async function loadSensors() {
   if (!currentStoreId) {
@@ -488,7 +460,7 @@ function renderStoreCounters(counters) {
 }
 
 // ------------------------------
-// Historial (por día) + gráfico
+// Historial / Gráfico (requiere /api/store/history)
 // ------------------------------
 async function fetchHistory(dateStr) {
   if (!currentStoreId) throw new Error("No hay tienda seleccionada.");
@@ -530,9 +502,7 @@ async function loadChart() {
   if (!chartCtx || !chartCanvas) return;
 
   try {
-    // Limpiar
     chartCtx.clearRect(0, 0, chartCanvas.width, chartCanvas.height);
-
     const dateStr = chartDate?.value;
     const data = await fetchHistory(dateStr);
     drawSimpleChart(data.byHour || {}, dateStr);
@@ -550,10 +520,8 @@ function drawSimpleChart(byHour, dateStr) {
 
   chartCtx.clearRect(0, 0, W, H);
 
-  // Horas 00..23
   const hours = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
 
-  // Acumulado por hora
   let accE = 0;
   let accS = 0;
   const pointsE = [];
@@ -569,12 +537,10 @@ function drawSimpleChart(byHour, dateStr) {
 
   const maxY = Math.max(1, ...pointsE, ...pointsS);
 
-  // Márgenes
   const padL = 50, padR = 15, padT = 20, padB = 45;
   const plotW = W - padL - padR;
   const plotH = H - padT - padB;
 
-  // Ejes
   chartCtx.strokeStyle = "rgba(0,0,0,0.25)";
   chartCtx.lineWidth = 1;
   chartCtx.beginPath();
@@ -583,17 +549,15 @@ function drawSimpleChart(byHour, dateStr) {
   chartCtx.lineTo(padL + plotW, padT + plotH);
   chartCtx.stroke();
 
-  // Etiquetas simples en Y
   chartCtx.fillStyle = "#0A2342";
   chartCtx.font = "12px system-ui";
   chartCtx.fillText(String(maxY), 10, padT + 5);
   chartCtx.fillText("0", 22, padT + plotH);
 
-  // Helpers
   const xAt = (i) => padL + (i / 23) * plotW;
   const yAt = (v) => padT + plotH - (v / maxY) * plotH;
 
-  // Línea Entradas
+  // Entradas
   chartCtx.strokeStyle = "#1C6DD0";
   chartCtx.lineWidth = 2;
   chartCtx.beginPath();
@@ -605,7 +569,7 @@ function drawSimpleChart(byHour, dateStr) {
   });
   chartCtx.stroke();
 
-  // Línea Salidas
+  // Salidas
   chartCtx.strokeStyle = "#c0392b";
   chartCtx.lineWidth = 2;
   chartCtx.beginPath();
@@ -617,25 +581,21 @@ function drawSimpleChart(byHour, dateStr) {
   });
   chartCtx.stroke();
 
-  // Leyenda
+  const storeName = getStoreName(currentStoreId);
   chartCtx.fillStyle = "#0A2342";
   chartCtx.font = "14px system-ui";
-  const storeName = getStoreName(currentStoreId);
   chartCtx.fillText(`${storeName} — ${dateStr} (acumulado por hora)`, padL, H - 20);
   chartCtx.font = "13px system-ui";
   chartCtx.fillText("Azul: Entradas | Rojo: Salidas", padL, H - 5);
 }
 
-// Botones historial / chart
 if (loadHistoryBtn) loadHistoryBtn.addEventListener("click", loadHistory);
 if (loadChartBtn) loadChartBtn.addEventListener("click", loadChart);
 
 // ------------------------------
-// Controles generales (tienda)
+// Controles generales
 // ------------------------------
-if (refreshBtn) {
-  refreshBtn.addEventListener("click", () => loadSensors());
-}
+if (refreshBtn) refreshBtn.addEventListener("click", () => loadSensors());
 
 if (refreshSelect) {
   refreshSelect.addEventListener("change", () => {
@@ -652,7 +612,6 @@ if (refreshSelect) {
   });
 }
 
-// Mensaje inicial
 if (sensorsContainer) {
   sensorsContainer.innerHTML = "<p>Inicia sesión para ver el contador de personas.</p>";
 }
