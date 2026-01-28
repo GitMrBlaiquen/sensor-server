@@ -40,6 +40,15 @@
 
     <!-- MENÚ LATERAL -->
     <aside class="sidebar">
+
+      <!-- USER BAR COMPACTA (ARRIBA A LA IZQUIERDA) -->
+      <section class="user-bar user-bar-compact">
+        <div class="user-left">
+          <span id="userInfo"></span>
+        </div>
+        <button id="logoutBtn" class="logout-btn">Salir</button>
+      </section>
+
       <div class="sidebar-title">Menú</div>
 
       <button class="nav-btn active" data-view="view-store">🏬 Tienda</button>
@@ -53,16 +62,6 @@
 
     <!-- CONTENIDO DERECHA -->
     <section class="content">
-
-      <!-- Barra de usuario -->
-      <section class="user-bar">
-        <div class="user-left">
-          <span id="userInfo"></span>
-        </div>
-        <div class="user-right">
-          <button id="logoutBtn" class="logout-btn">Cerrar sesión</button>
-        </div>
-      </section>
 
       <!-- Selector de cliente (solo admin) -->
       <section class="client-selector" id="clientSelectorSection" style="display: none;">
