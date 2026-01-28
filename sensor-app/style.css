@@ -114,6 +114,10 @@ header p { margin: 4px 0 0; opacity: 0.95; }
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
   border-left: 6px solid #1C6DD0;
   height: fit-content;
+
+  /* 👇 IMPORTANTE:
+     Antes estaba sticky, por eso “seguía” al hacer scroll.
+     Ahora queda fijo en su lugar (NO acompaña el scroll). */
   position: relative;
   top: auto;
 }
@@ -128,6 +132,49 @@ header p { margin: 4px 0 0; opacity: 0.95; }
   margin-top: 12px;
   font-size: 0.9rem;
   opacity: 0.8;
+}
+
+/* -------- USER BAR COMPACTA DENTRO DEL SIDEBAR -------- */
+.user-bar.user-bar-compact {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border-left: 5px solid #1C6DD0;
+  background: rgba(255,255,255,0.55);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.06);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.user-bar.user-bar-compact .user-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.user-bar.user-bar-compact .user-icon { font-size: 16px; }
+.user-bar.user-bar-compact .user-name {
+  font-weight: 900;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+.user-bar.user-bar-compact .user-role {
+  font-size: 0.85rem;
+  opacity: 0.85;
+  white-space: nowrap;
+}
+
+/* Botón salir compacto dentro del sidebar */
+.user-bar.user-bar-compact .logout-btn {
+  padding: 7px 10px;
+  border-radius: 10px;
+  font-size: 0.9rem;
 }
 
 /* Botones menú (NO se pisan con el button global) */
@@ -191,24 +238,6 @@ label {
   align-items: center;
   flex-wrap: wrap;
 }
-
-/* ---------------- USER BAR ---------------- */
-.user-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-  background: #dfe3eb;
-  padding: 12px 16px;
-  border-radius: 10px;
-  border-left: 5px solid #1C6DD0;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-}
-
-.user-left { display: flex; align-items: center; gap: 6px; }
-.user-icon { font-size: 18px; }
-.user-name { font-weight: 800; font-size: 1rem; }
-.user-role { font-size: 0.9rem; opacity: 0.85; margin-left: 4px; }
 
 /* ---------------- BOTONES (solo botones normales, sin botón de navegación) ---------------- */
 button:not(.nav-btn) {
@@ -395,5 +424,3 @@ footer {
   header h1 { font-size: 1.15rem; }
   .login-card { width: 92%; }
 }
-
-
