@@ -159,7 +159,7 @@ header p { margin: 4px 0 0; opacity: 0.95; }
 
 .content { min-width: 0; }
 
-/* ---------------- SECCIONES SELECTORES ---------------- */
+/* ---------------- SELECTORES ---------------- */
 .client-selector,
 .store-selector {
   background: #dfe3eb;
@@ -210,7 +210,7 @@ label {
 .user-name { font-weight: 800; font-size: 1rem; }
 .user-role { font-size: 0.9rem; opacity: 0.85; margin-left: 4px; }
 
-/* ---------------- BOTONES (solo botones normales, NO nav-btn) ---------------- */
+/* ---------------- BOTONES (solo botones normales, sin botón de navegación) ---------------- */
 button:not(.nav-btn) {
   padding: 10px 18px;
   border-radius: 8px;
@@ -395,4 +395,5 @@ footer {
   header h1 { font-size: 1.15rem; }
   .login-card { width: 92%; }
 }
+
 
