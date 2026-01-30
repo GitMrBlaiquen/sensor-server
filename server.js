@@ -79,7 +79,7 @@ app.post("/api/login", (req, res) => {
 
   return res.json({
     username: user.username,
-    role: user.role, // "admin" / "dueño"
+    role: user.role,
     stores: userStores,
   });
 });
@@ -98,7 +98,7 @@ const storeCounters = {}; // { storeId: { entradas, salidas } }
 const dailyCounters = {}; // { storeId: { "YYYY-MM-DD": { entradas, salidas } } }
 
 // Historial por hora del día (para gráfico)
-const hourlyCounters = {}; 
+const hourlyCounters = {};
 // { storeId: { "YYYY-MM-DD": { "00":{entradas,salidas}, ..., "23":{entradas,salidas} } } }
 
 function safeNumber(v, fallback = 0) {
@@ -173,16 +173,26 @@ function addDelta(storeId, deltaE, deltaS, ts = Date.now()) {
 // --------------------------------------------------------------
 // MAPEO: 1 SENSOR REAL (SN) = 1 TIENDA
 // --------------------------------------------------------------
+// ✅ Tú confirmaste que este SN es el de la demo:
+//    221000002507152508
+// Lo dejo mapeado a arrow-01 para la demo.
 const DEVICE_TO_STORE = {
-  // ⚠️ Debe ser EXACTO a lo que llega como body.sn
-  "211000002507152051": "arrow-01",
-  "221000002507152508": "arrow-02",
-  // "SN_OTRO": "arrow-02",
+  "221000002507152508": "arrow-01",
+
+  // Si tienes otro sensor, lo agregas aquí:
+  // "211000002507152051": "arrow-02",
 };
 
 function getStoreIdFromDevice(sn) {
   if (!sn) return null;
   return DEVICE_TO_STORE[String(sn)] || null;
+}
+
+function getSnFromStoreId(storeId) {
+  // Busca el primer SN que apunte a esa tienda (como tienes 1 SN por tienda, sirve perfecto)
+  const entries = Object.entries(DEVICE_TO_STORE);
+  const found = entries.find(([, sId]) => sId === storeId);
+  return found ? found[0] : null;
 }
 
 function okSensor(res, extraData = {}) {
@@ -209,6 +219,66 @@ function normalizeCounts(body) {
 
   return { entradas, salidas };
 }
+
+// --------------------------------------------------------------
+// ---------   HEARTBEAT TRACKING (ONLINE / OFFLINE)   ----------
+// --------------------------------------------------------------
+const lastHeartbeatBySn = {}; // { "SN": timestampMs }
+const HEARTBEAT_ONLINE_MS = 90 * 1000; // 🟢 online si llegó hb hace <= 90s
+
+function isOnlineBySn(sn) {
+  const last = lastHeartbeatBySn[String(sn)] || 0;
+  if (!last) return false;
+  return Date.now() - last <= HEARTBEAT_ONLINE_MS;
+}
+
+// Endpoint para frontend (todos)
+app.get("/api/sensors/status", (req, res) => {
+  const now = Date.now();
+  const result = {};
+
+  Object.keys(DEVICE_TO_STORE).forEach((sn) => {
+    const last = lastHeartbeatBySn[String(sn)] || 0;
+    result[String(sn)] = {
+      sn: String(sn),
+      storeId: DEVICE_TO_STORE[String(sn)] || null,
+      online: last > 0 && now - last <= HEARTBEAT_ONLINE_MS,
+      lastHeartbeat: last || null,
+      lastHeartbeatAgoMs: last ? now - last : null,
+    };
+  });
+
+  res.json(result);
+});
+
+// Endpoint para frontend (una tienda)
+app.get("/api/store/status", (req, res) => {
+  const storeId = String(req.query.storeId || "");
+  if (!storeId) return res.status(400).json({ error: "Falta storeId" });
+
+  const sn = getSnFromStoreId(storeId);
+  if (!sn) {
+    return res.json({
+      storeId,
+      sn: null,
+      online: false,
+      lastHeartbeat: null,
+      lastHeartbeatAgoMs: null,
+      note: "No hay SN mapeado a esta tienda en DEVICE_TO_STORE",
+    });
+  }
+
+  const last = lastHeartbeatBySn[String(sn)] || 0;
+  const now = Date.now();
+
+  return res.json({
+    storeId,
+    sn: String(sn),
+    online: isOnlineBySn(sn),
+    lastHeartbeat: last || null,
+    lastHeartbeatAgoMs: last ? now - last : null,
+  });
+});
 
 // ---------------- DISPLAY POR SN (para pantallas demo) ----------------
 // GET /api/display?sn=221000002507152508
@@ -255,8 +325,8 @@ app.post("/api/sensors/data", (req, res) => {
   else if (type === "salida") dS = safeValue;
 
   const result = addDelta(storeId, dE, dS, Date.now());
-
   console.log("🧪 Simulador:", sensorKey, "=>", result);
+
   return res.json({ status: "ok" });
 });
 
@@ -269,7 +339,9 @@ app.post("/api/camera/heartBeat", (req, res) => {
   const body = req.body || {};
   const sn = body.sn;
 
-  console.log("❤️ heartBeat:", { from: req.ip, sn });
+  if (sn) lastHeartbeatBySn[String(sn)] = Date.now();
+
+  console.log("❤️ heartBeat:", { from: req.ip, sn, online: sn ? isOnlineBySn(sn) : false });
 
   // Ajustable: cada cuántos minutos manda data
   return okSensor(res, { uploadInterval: 1, dataMode: "Add" });
@@ -279,6 +351,9 @@ app.post("/api/camera/dataUpload", (req, res) => {
   const body = req.body || {};
   const sn = body.sn;
   const storeId = getStoreIdFromDevice(sn);
+
+  // si por algún motivo no llega heartBeat, al menos dataUpload lo marca como “vivo”
+  if (sn) lastHeartbeatBySn[String(sn)] = Date.now();
 
   console.log("📦 dataUpload:", { from: req.ip, sn, storeId });
 
@@ -301,7 +376,7 @@ app.post("/api/camera/dataUpload", (req, res) => {
 
   const { entradas, salidas } = normalizeCounts(body);
 
-  // IMPORTANTE: asumimos que el sensor manda DELTAS (lo normal en “Add”).
+  // IMPORTANTE: asumimos que el sensor manda DELTAS (modo Add)
   const result = addDelta(storeId, entradas, salidas, Date.now());
 
   console.log(`✅ ${storeId} (SN ${sn}) +E ${entradas} +S ${salidas} =>`, result);
@@ -311,8 +386,6 @@ app.post("/api/camera/dataUpload", (req, res) => {
 // --------------------------------------------------------------
 // ------------------------   CONSULTAS WEB   -------------------
 // --------------------------------------------------------------
-
-// Contador “en vivo”
 app.get("/api/store/counters", (req, res) => {
   const { storeId } = req.query;
   if (!storeId) return res.status(400).json({ error: "Falta storeId en la query" });
@@ -324,7 +397,6 @@ app.get("/api/store/counters", (req, res) => {
   res.json({ storeId, entradas, salidas, dentro });
 });
 
-// Días con datos (para calendario si luego quieres “marcar” días)
 app.get("/api/store/days", (req, res) => {
   const { storeId } = req.query;
   if (!storeId) return res.status(400).json({ error: "Falta storeId en la query" });
@@ -334,7 +406,6 @@ app.get("/api/store/days", (req, res) => {
   res.json({ storeId, days });
 });
 
-// Resumen del día + byHour (esto lo usa tu app.js para gráfico)
 app.get("/api/store/history", (req, res) => {
   const { storeId, date } = req.query;
   if (!storeId) return res.status(400).json({ error: "Falta storeId en la query" });
@@ -344,8 +415,6 @@ app.get("/api/store/history", (req, res) => {
 
   const { entradas, salidas } = dailyCounters[storeId][date];
   const dentro = Math.max(entradas - salidas, 0);
-
-  // byHour: { "00":{entradas,salidas}, ... }
   const byHour = hourlyCounters[storeId][date] || {};
 
   res.json({ storeId, date, entradas, salidas, dentro, byHour });
@@ -357,14 +426,10 @@ app.get("/api/sensors", (req, res) => res.json(Object.values(sensors)));
 app.get("/api/debug/counters", (req, res) => res.json(storeCounters));
 app.get("/api/debug/daily", (req, res) => res.json(dailyCounters));
 app.get("/api/debug/hourly", (req, res) => res.json(hourlyCounters));
+app.get("/api/debug/heartbeat", (req, res) => res.json(lastHeartbeatBySn));
 
 // ---------------- START ----------------
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Servidor TIENDAS activo en el puerto ${PORT}`);
 });
-
-
-
-
-
