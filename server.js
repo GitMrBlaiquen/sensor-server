@@ -178,6 +178,7 @@ function addDelta(storeId, deltaE, deltaS, ts = Date.now()) {
 // Lo dejo mapeado a arrow-01 para la demo.
 const DEVICE_TO_STORE = {
   "221000002507152508": "arrow-01",
+  "211000002507152051": "arrow-02",
 
   // Si tienes otro sensor, lo agregas aquí:
   // "211000002507152051": "arrow-02",
@@ -433,3 +434,4 @@ const PORT = process.env.PORT || 10000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Servidor TIENDAS activo en el puerto ${PORT}`);
 });
+
