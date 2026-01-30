@@ -5,6 +5,7 @@ const BASE_URL = window.location.origin;
 const LOGIN_URL = `${BASE_URL}/api/login`;
 const COUNTERS_URL = `${BASE_URL}/api/store/counters`;
 const HISTORY_URL = `${BASE_URL}/api/store/history`;
+const STATUS_URL = `${BASE_URL}/api/store/status`;
 
 // ------------------------------
 // Elementos principales
@@ -58,7 +59,7 @@ const historyResult = document.getElementById("historyResult");
 let autoRefreshId = null;
 
 let currentUser = null;
-let currentRole = null;       // "admin" o "dueño"
+let currentRole = null; // "admin" o "dueño"
 let currentStores = [];
 let currentStoreId = null;
 
@@ -69,8 +70,8 @@ let currentClientId = null;
 // ------------------------------
 // Inactividad
 // ------------------------------
-const INACTIVITY_LIMIT_MS = 1 * 60 * 1000;  // 1 minuto
-const WARNING_DURATION_MS = 30 * 1000;      // 30 segundos
+const INACTIVITY_LIMIT_MS = 1 * 60 * 1000; // 1 minuto
+const WARNING_DURATION_MS = 30 * 1000; // 30 segundos
 
 let inactivityTimer = null;
 let logoutTimer = null;
@@ -365,7 +366,7 @@ function logout() {
   if (passwordInput) passwordInput.value = "";
 
   if (mainContent) mainContent.style.display = "none";
-  if (loginPanel) loginPanel.style.display = "flex"; // importante: mantener centrado
+  if (loginPanel) loginPanel.style.display = "flex";
 }
 
 if (logoutBtn) logoutBtn.addEventListener("click", logout);
@@ -391,7 +392,7 @@ if (storeSelect) {
 }
 
 // ------------------------------
-// Contador TIENDA
+// Contador TIENDA + ESTADO (heartbeat)
 // ------------------------------
 async function loadSensors() {
   if (!currentStoreId) {
@@ -402,12 +403,18 @@ async function loadSensors() {
   try {
     sensorsContainer.innerHTML = "<p>Cargando datos de la tienda...</p>";
 
-    const url = `${COUNTERS_URL}?storeId=${encodeURIComponent(currentStoreId)}`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error("Error al obtener los contadores: " + res.status);
+    const urlCounters = `${COUNTERS_URL}?storeId=${encodeURIComponent(currentStoreId)}`;
+    const urlStatus = `${STATUS_URL}?storeId=${encodeURIComponent(currentStoreId)}`;
 
-    const data = await res.json();
-    renderStoreCounters(data);
+    const [resCounters, resStatus] = await Promise.all([fetch(urlCounters), fetch(urlStatus)]);
+
+    if (!resCounters.ok) throw new Error("Error al obtener contadores: " + resCounters.status);
+    if (!resStatus.ok) throw new Error("Error al obtener estado: " + resStatus.status);
+
+    const counters = await resCounters.json();
+    const status = await resStatus.json();
+
+    renderStoreCounters(counters, status);
   } catch (err) {
     console.error(err);
     sensorsContainer.innerHTML =
@@ -415,14 +422,27 @@ async function loadSensors() {
   }
 }
 
-function renderStoreCounters(counters) {
+function renderStoreCounters(counters, status) {
   if (!counters) {
     sensorsContainer.innerHTML = "<p>No hay datos disponibles aún.</p>";
     return;
   }
 
   const { storeId, entradas = 0, salidas = 0, dentro = 0 } = counters;
+
+  const online = !!status?.online;
+  const sn = status?.sn || "SN desconocido";
+
   sensorsContainer.innerHTML = "";
+
+  // Leyenda
+  const legend = document.createElement("div");
+  legend.className = "sensor-legend";
+  legend.innerHTML = `
+    <span class="legend-item"><span class="status-pill status-on">🟢</span> Encendido</span>
+    <span class="legend-item"><span class="status-pill status-off">🔴</span> Apagado</span>
+  `;
+  sensorsContainer.appendChild(legend);
 
   const card = document.createElement("article");
   card.className = "sensor-card";
@@ -432,8 +452,17 @@ function renderStoreCounters(counters) {
 
   card.innerHTML = `
     <div class="sensor-header">
-      <div class="sensor-id">${storeName}</div>
-      <div class="sensor-type">Contador de personas</div>
+      <div>
+        <div class="sensor-id">${storeName}</div>
+        <div class="sensor-type">Contador de personas</div>
+      </div>
+
+      <div class="sensor-right">
+        <div class="sensor-sn">SN: <strong>${sn}</strong></div>
+        <div class="status-pill ${online ? "status-on" : "status-off"}">
+          ${online ? "🟢 Encendido" : "🔴 Apagado"}
+        </div>
+      </div>
     </div>
 
     <div class="store-counters">
