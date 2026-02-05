@@ -90,18 +90,11 @@ app.post("/api/login", (req, res) => {
 // --------------------------------------------------------------
 // -----------   CONTADOR + HISTORIAL POR TIENDA   --------------
 // --------------------------------------------------------------
+const sensors = {}; // debug últimos payloads
 
-// Debug: últimos payloads por sensor
-const sensors = {};
-
-// Contadores “en vivo”
-const storeCounters = {}; // { storeId: {...} }
-
-// Historial por día (resumen)
-const dailyCounters = {}; // { storeId: { "YYYY-MM-DD": {...} } }
-
-// Historial por hora del día (para gráfico)
-const hourlyCounters = {}; // { storeId: { "YYYY-MM-DD": { "00":{...}, ... } } }
+const storeCounters = {}; // vivo
+const dailyCounters = {}; // resumen por día
+const hourlyCounters = {}; // por hora
 
 function safeNumber(v, fallback = 0) {
   const n = Number(v);
@@ -112,11 +105,9 @@ function emptyCounters() {
   return {
     entradas: 0,
     salidas: 0,
-
-    // ✅ nuevos
     inChild: 0,
     outChild: 0,
-    workcardCount: 0, // trabajadores detectados con tarjeta (NO in/out)
+    workcardCount: 0, // ✅ trabajadores separados
   };
 }
 
@@ -155,8 +146,6 @@ function hourKeyFromTs(ts = Date.now()) {
   return String(d.getHours()).padStart(2, "0");
 }
 
-// ✅ ahora addDelta recibe un objeto delta
-// delta = { entradas, salidas, inChild, outChild, workcardCount }
 function addDelta(storeId, delta, ts = Date.now()) {
   ensureStore(storeId);
 
@@ -229,14 +218,19 @@ function okSensor(res, extraData = {}) {
   });
 }
 
-// ✅ lee in/out + inChild/outChild + workcard por attributes
+/**
+ * ✅ Aquí está el cambio clave:
+ * - Calculamos workIn/workOut mirando attributes (workcard=1)
+ * - Restamos workIn de entradas y workOut de salidas
+ * - workcardCount se guarda aparte y NO afecta el conteo de personas
+ */
 function normalizeCounts(body) {
-  const entradas = safeNumber(
+  const entradasRaw = safeNumber(
     body.in ?? body.enter ?? body.Enter ?? body.In ?? body.inNum ?? body.InNum ?? 0,
     0
   );
 
-  const salidas = safeNumber(
+  const salidasRaw = safeNumber(
     body.out ?? body.leave ?? body.Leave ?? body.Out ?? body.outNum ?? body.OutNum ?? 0,
     0
   );
@@ -244,12 +238,24 @@ function normalizeCounts(body) {
   const inChild = safeNumber(body.inChild ?? body.InChild ?? 0, 0);
   const outChild = safeNumber(body.outChild ?? body.OutChild ?? 0, 0);
 
-  // ✅ trabajadores por tarjeta: NO es in/out, solo “cuántos workcard=1 vinieron en este upload”
   const attrs = Array.isArray(body.attributes) ? body.attributes : [];
   let workcardCount = 0;
+  let workIn = 0;
+  let workOut = 0;
+
   for (const a of attrs) {
-    if (Number(a?.workcard || 0) === 1) workcardCount += 1;
+    if (Number(a?.workcard || 0) !== 1) continue;
+
+    workcardCount += 1;
+
+    const eventType = Number(a?.eventType);
+    if (eventType === 1) workIn += 1; // asumimos 1=entrada
+    else if (eventType === 2) workOut += 1; // asumimos 2=salida
+    // si viene otro valor, no restamos (para no meter error)
   }
+
+  const entradas = Math.max(entradasRaw - workIn, 0);
+  const salidas = Math.max(salidasRaw - workOut, 0);
 
   return { entradas, salidas, inChild, outChild, workcardCount };
 }
@@ -257,8 +263,8 @@ function normalizeCounts(body) {
 // --------------------------------------------------------------
 // ---------   HEARTBEAT TRACKING (ONLINE / OFFLINE)   ----------
 // --------------------------------------------------------------
-const lastHeartbeatBySn = {}; // { "SN": timestampMs }
-const HEARTBEAT_ONLINE_MS = 90 * 1000; // 🟢 online si llegó hb hace <= 90s
+const lastHeartbeatBySn = {};
+const HEARTBEAT_ONLINE_MS = 90 * 1000;
 
 function isOnlineBySn(sn) {
   const last = lastHeartbeatBySn[String(sn)] || 0;
@@ -266,7 +272,6 @@ function isOnlineBySn(sn) {
   return Date.now() - last <= HEARTBEAT_ONLINE_MS;
 }
 
-// Endpoint para frontend (todos)
 app.get("/api/sensors/status", (req, res) => {
   const now = Date.now();
   const result = {};
@@ -285,7 +290,6 @@ app.get("/api/sensors/status", (req, res) => {
   res.json(result);
 });
 
-// Endpoint para frontend (una tienda)
 app.get("/api/store/status", (req, res) => {
   const storeId = String(req.query.storeId || "");
   if (!storeId) return res.status(400).json({ error: "Falta storeId" });
@@ -314,7 +318,7 @@ app.get("/api/store/status", (req, res) => {
   });
 });
 
-// ---------------- DISPLAY POR SN (para pantallas demo) ----------------
+// ---------------- DISPLAY POR SN ----------------
 app.get("/api/display", (req, res) => {
   const sn = String(req.query.sn || "");
   if (!sn) return res.status(400).json({ error: "Falta sn" });
@@ -369,23 +373,18 @@ app.post("/api/sensors/data", (req, res) => {
     workcardCount: 0,
   };
 
-  const result = addDelta(storeId, delta, Date.now());
-  console.log("🧪 Simulador:", sensorKey, "=>", result);
-
+  addDelta(storeId, delta, Date.now());
   return res.json({ status: "ok" });
 });
 
 // --------------------------------------------------------------
 // 2) SENSOR REAL (JSON MODE)
-//    POST /api/camera/heartBeat
-//    POST /api/camera/dataUpload
 // --------------------------------------------------------------
 app.post("/api/camera/heartBeat", (req, res) => {
   const body = req.body || {};
   const sn = body.sn;
 
   if (sn) lastHeartbeatBySn[String(sn)] = Date.now();
-
   console.log("❤️ heartBeat:", { from: req.ip, sn, online: sn ? isOnlineBySn(sn) : false });
 
   return okSensor(res, { uploadInterval: 1, dataMode: "Add" });
@@ -417,12 +416,11 @@ app.post("/api/camera/dataUpload", (req, res) => {
   }
 
   const delta = normalizeCounts(body);
-  const result = addDelta(storeId, delta, Date.now());
+  addDelta(storeId, delta, Date.now());
 
   console.log(
-    `✅ ${storeId} (SN ${sn}) +E ${delta.entradas} +S ${delta.salidas} ` +
-      `+NiñosE ${delta.inChild} +NiñosS ${delta.outChild} +WorkCard ${delta.workcardCount} =>`,
-    result
+    `✅ ${storeId} (SN ${sn}) Clientes +E ${delta.entradas} +S ${delta.salidas} | ` +
+      `Niños +E ${delta.inChild} +S ${delta.outChild} | WorkCard ${delta.workcardCount}`
   );
 
   return okSensor(res);
@@ -450,15 +448,6 @@ app.get("/api/store/counters", (req, res) => {
   });
 });
 
-app.get("/api/store/days", (req, res) => {
-  const { storeId } = req.query;
-  if (!storeId) return res.status(400).json({ error: "Falta storeId en la query" });
-
-  ensureStore(storeId);
-  const days = Object.keys(dailyCounters[storeId] || {}).sort();
-  res.json({ storeId, days });
-});
-
 app.get("/api/store/history", (req, res) => {
   const { storeId, date } = req.query;
   if (!storeId) return res.status(400).json({ error: "Falta storeId en la query" });
@@ -476,17 +465,14 @@ app.get("/api/store/history", (req, res) => {
     entradas: d.entradas,
     salidas: d.salidas,
     dentro,
-
-    // ✅ nuevos en resumen
     inChild: d.inChild,
     outChild: d.outChild,
     workcardCount: d.workcardCount,
-
     byHour,
   });
 });
 
-// Debug / utilidades
+// Debug
 app.get("/api/stores", (req, res) => res.json(Object.values(stores)));
 app.get("/api/sensors", (req, res) => res.json(Object.values(sensors)));
 app.get("/api/debug/counters", (req, res) => res.json(storeCounters));
