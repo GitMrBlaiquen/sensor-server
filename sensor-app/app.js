@@ -1,3 +1,7 @@
+// ================================
+// app.js (reescrito)
+// ================================
+
 // URL base de la API
 const BASE_URL = window.location.origin;
 // const BASE_URL = "http://localhost:10000";
@@ -130,9 +134,7 @@ function fillStoreSelectForClient(clientId) {
   if (!storeSelect) return;
   storeSelect.innerHTML = "";
 
-  const filteredStores = currentStores.filter(
-    (s) => getClientIdFromStoreId(s.id) === clientId
-  );
+  const filteredStores = currentStores.filter((s) => getClientIdFromStoreId(s.id) === clientId);
 
   filteredStores.forEach((store) => {
     const opt = document.createElement("option");
@@ -365,12 +367,11 @@ async function login() {
 
     resetInactivityTimers();
 
-    // ✅ Arranca el polling del estado
     startStatusPolling();
 
     if (currentStoreId) {
       await loadSensors();
-      refreshStatusOnly(); // fuerza primer update rápido
+      refreshStatusOnly();
     } else {
       sensorsContainer.innerHTML = "<p>No hay tiendas disponibles para este usuario.</p>";
     }
@@ -394,7 +395,6 @@ function logout() {
     autoRefreshId = null;
   }
 
-  // ✅ detener polling estado
   stopStatusPolling();
 
   clearInactivityTimers();
@@ -447,7 +447,7 @@ if (storeSelect) {
   storeSelect.addEventListener("change", () => {
     currentStoreId = storeSelect.value;
     loadSensors();
-    refreshStatusOnly(); // ✅ cambia el pill altiro
+    refreshStatusOnly();
   });
 }
 
@@ -487,7 +487,17 @@ function renderStoreCounters(counters, status) {
     return;
   }
 
-  const { storeId, entradas = 0, salidas = 0, dentro = 0 } = counters;
+  const {
+    storeId,
+    entradas = 0,
+    salidas = 0,
+    dentro = 0,
+
+    // ✅ nuevos
+    inChild = 0,
+    outChild = 0,
+    workcardCount = 0,
+  } = counters;
 
   const online = !!status?.online;
   const sn = status?.sn || "SN desconocido";
@@ -517,10 +527,7 @@ function renderStoreCounters(counters, status) {
       </div>
 
       <div class="sensor-right">
-        <!-- ✅ ID para actualizar sin re-render -->
         <div class="sensor-sn" id="sensorSn">SN: <strong>${sn}</strong></div>
-
-        <!-- ✅ ID para actualizar sin re-render -->
         <div id="statusPill" class="status-pill ${online ? "status-on" : "status-off"}">
           ${online ? "🟢 Encendido" : "🔴 Apagado"}
         </div>
@@ -539,6 +546,21 @@ function renderStoreCounters(counters, status) {
       <div class="store-counter-item">
         <span class="label">Personas DENTRO de la tienda</span>
         <span class="value">${dentro}</span>
+      </div>
+
+      <hr style="border:none;border-top:1px solid rgba(0,0,0,0.12);margin:10px 0;" />
+
+      <div class="store-counter-item">
+        <span class="label">Niños que han ENTRADO</span>
+        <span class="value">${inChild}</span>
+      </div>
+      <div class="store-counter-item">
+        <span class="label">Niños que han SALIDO</span>
+        <span class="value">${outChild}</span>
+      </div>
+      <div class="store-counter-item">
+        <span class="label">Trabajadores (tarjeta) detectados</span>
+        <span class="value">${workcardCount}</span>
       </div>
     </div>
 
@@ -576,6 +598,10 @@ async function loadHistory() {
     const salidas = Number(data.salidas || 0);
     const dentro = Math.max(entradas - salidas, 0);
 
+    const inChild = Number(data.inChild || 0);
+    const outChild = Number(data.outChild || 0);
+    const workcardCount = Number(data.workcardCount || 0);
+
     const storeName = getStoreName(data.storeId);
 
     historyResult.innerHTML = `
@@ -583,6 +609,10 @@ async function loadHistory() {
       <p><strong>Entradas:</strong> ${entradas}</p>
       <p><strong>Salidas:</strong> ${salidas}</p>
       <p><strong>Dentro (estimado):</strong> ${dentro}</p>
+      <hr/>
+      <p><strong>Niños (entrada):</strong> ${inChild}</p>
+      <p><strong>Niños (salida):</strong> ${outChild}</p>
+      <p><strong>Trabajadores (tarjeta) detectados:</strong> ${workcardCount}</p>
     `;
   } catch (e) {
     historyResult.innerHTML = `<p style="color:red;">${e.message}</p>`;
@@ -628,7 +658,10 @@ function drawSimpleChart(byHour, dateStr) {
 
   const maxY = Math.max(1, ...pointsE, ...pointsS);
 
-  const padL = 50, padR = 15, padT = 20, padB = 45;
+  const padL = 50,
+    padR = 15,
+    padT = 20,
+    padB = 45;
   const plotW = W - padL - padR;
   const plotH = H - padT - padB;
 
