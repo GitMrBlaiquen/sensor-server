@@ -216,8 +216,6 @@ function okSensor(res, extraData = {}) {
   });
 }
 
-// ✅ CLAVE: workersIn se obtiene de attributes[].workcard=1
-// ✅ Clientes entradas = totalEntradas - workersIn
 function normalizeCounts(body) {
   const totalEntradas = safeNumber(
     body.in ?? body.enter ?? body.Enter ?? body.In ?? body.inNum ?? body.InNum ?? 0,
@@ -234,23 +232,25 @@ function normalizeCounts(body) {
 
   const attrs = Array.isArray(body.attributes) ? body.attributes : [];
 
-  // ✅ según tu regla: workcard cuenta 1 por trabajador (sin salida)
+  // ✅ workcard: 1 por trabajador (solo entrada)
   let workersIn = 0;
   for (const a of attrs) {
     if (Number(a?.workcard || 0) === 1) workersIn += 1;
   }
 
-  // ✅ RESTA ENTRADAS DE TRABAJADORES
-  const entradasClientes = Math.max(totalEntradas - workersIn, 0);
+  // ✅ CLIENTES = total - niños - trabajadores
+  const entradasClientes = Math.max(totalEntradas - inChild - workersIn, 0);
 
-  // ✅ salidas quedan igual porque no hay salida de workcard
-  const salidasClientes = Math.max(totalSalidas, 0);
+  // ✅ salidasClientes = totalSalidas - niños que salieron (trabajadores no afectan out)
+  const salidasClientes = Math.max(totalSalidas - outChild, 0);
 
   return {
     totalEntradas,
     totalSalidas,
-    entradas: entradasClientes,
-    salidas: salidasClientes,
+
+    entradas: entradasClientes, // clientes
+    salidas: salidasClientes,   // clientes
+
     inChild,
     outChild,
     workersIn,
@@ -383,3 +383,4 @@ const PORT = process.env.PORT || 10000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Servidor TIENDAS activo en el puerto ${PORT}`);
 });
+
