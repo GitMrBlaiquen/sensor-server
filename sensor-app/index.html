@@ -36,127 +36,101 @@
   </section>
 
   <!-- CONTENIDO PRINCIPAL (se muestra SOLO tras login) -->
-  <main id="mainContent" class="app-shell" style="display: none;">
+ <main id="mainContent" class="app-shell" style="display: none;">
 
-    <!-- MENÚ LATERAL -->
-    <aside class="sidebar">
+  <!-- MENÚ LATERAL -->
+  <aside class="sidebar">
 
-      <!-- USER BAR COMPACTA (ARRIBA A LA IZQUIERDA) -->
-      <section class="user-bar user-bar-compact">
-        <div class="user-left">
-          <span id="userInfo"></span>
-        </div>
+    <!-- ✅ Usuario compacto ARRIBA del menú -->
+    <section class="user-bar user-bar-compact">
+      <div class="user-left">
+        <span id="userInfo"></span>
+      </div>
+      <div class="user-right">
         <button id="logoutBtn" class="logout-btn">Salir</button>
-      </section>
-
-      <div class="sidebar-title">Menú</div>
-
-      <button class="nav-btn active" data-view="view-store">🏬 Tienda</button>
-      <button class="nav-btn" data-view="view-charts">📈 Gráficos</button>
-      <button class="nav-btn" data-view="view-calendar">📅 Calendario</button>
-
-      <div class="sidebar-hint">
-        Selecciona una opción para ver los datos.
-      </div>
-    </aside>
-
-    <!-- CONTENIDO DERECHA -->
-    <section class="content">
-
-      <!-- Selector de cliente (solo admin) -->
-      <section class="client-selector" id="clientSelectorSection" style="display: none;">
-        <h2>Seleccionar cliente</h2>
-        <label>
-          Cliente:
-          <select id="clientSelect"></select>
-        </label>
-      </section>
-
-      <!-- Selector de tienda (siempre visible después de login) -->
-      <section class="store-selector" id="storeSelectorSection">
-        <h2>Seleccionar tienda</h2>
-        <label>
-          Tienda:
-          <select id="storeSelect"></select>
-        </label>
-      </section>
-
-      <!-- VISTA 1: TIENDA -->
-      <section id="view-store" class="view active-view">
-        <section class="toolbar">
-          <button id="refreshBtn">Actualizar ahora</button>
-          <label>
-            Auto-actualizar cada
-            <select id="refreshInterval">
-              <option value="0">No auto</option>
-              <option value="5000">5 s</option>
-              <option value="10000" selected>10 s</option>
-              <option value="30000">30 s</option>
-            </select>
-          </label>
-        </section>
-
-        <section id="sensorsContainer"></section>
-      </section>
-
-      <!-- VISTA 2: GRÁFICOS -->
-      <section id="view-charts" class="view">
-        <h2>Gráfico por día</h2>
-        <p class="view-desc">
-          Selecciona una fecha para ver un gráfico simple (entradas vs salidas acumuladas).
-        </p>
-
-        <div class="tool-row">
-          <label>
-            Fecha:
-            <input id="chartDate" type="date" />
-          </label>
-          <button id="loadChartBtn">Cargar gráfico</button>
-        </div>
-
-        <div class="chart-wrap">
-          <canvas id="chartCanvas" width="900" height="320"></canvas>
-        </div>
-      </section>
-
-      <!-- VISTA 3: CALENDARIO / RESUMEN -->
-      <section id="view-calendar" class="view">
-        <h2>Resumen por día</h2>
-        <p class="view-desc">
-          Selecciona un día para ver el resumen (entradas, salidas, dentro).
-        </p>
-
-        <div class="tool-row">
-          <label>
-            Día:
-            <input id="historyDate" type="date" />
-          </label>
-          <button id="loadHistoryBtn">Ver resumen</button>
-        </div>
-
-        <section id="historyResult" class="history-box">
-          <p>Selecciona una fecha para ver el resumen del día.</p>
-        </section>
-      </section>
-
-    </section>
-
-    <!-- POP-UP INACTIVIDAD -->
-    <section id="sessionWarningModal" class="modal-overlay" style="display: none;">
-      <div class="modal-box">
-        <h2>Sesión inactiva</h2>
-        <p>
-          No se ha detectado actividad. Serás desconectado en
-          <strong><span id="countdownSeconds">60</span> segundos</strong>.
-        </p>
-        <div class="modal-actions">
-          <button id="stayLoggedBtn">Seguir conectado</button>
-          <button id="logoutNowBtn" class="logout-btn">Cerrar sesión ahora</button>
-        </div>
       </div>
     </section>
 
-  </main>
+    <div class="sidebar-title">Menú</div>
+
+    <button class="nav-btn active" data-view="view-store">🏬 Tienda</button>
+    <button class="nav-btn" data-view="view-charts">📈 Gráficos</button>
+    <button class="nav-btn" data-view="view-calendar">📅 Calendario</button>
+
+    <div class="sidebar-hint">
+      Selecciona una opción para ver los datos.
+    </div>
+  </aside>
+
+  <!-- CONTENIDO DERECHA -->
+  <section class="content">
+
+    <!-- ❌ Quitamos la barra de usuario de aquí -->
+
+    <!-- Selector de cliente (solo admin) -->
+    <section class="client-selector" id="clientSelectorSection" style="display: none;">
+      <h2>Seleccionar cliente</h2>
+      <label>
+        Cliente:
+        <select id="clientSelect"></select>
+      </label>
+    </section>
+
+    <!-- Selector de tienda -->
+    <section class="store-selector" id="storeSelectorSection">
+      <h2>Seleccionar tienda</h2>
+      <label>
+        Tienda:
+        <select id="storeSelect"></select>
+      </label>
+    </section>
+
+    <!-- VISTA 1 -->
+    <section id="view-store" class="view active-view">
+      <section class="toolbar">
+        <button id="refreshBtn">Actualizar ahora</button>
+        <label>
+          Auto-actualizar cada
+          <select id="refreshInterval">
+            <option value="0">No auto</option>
+            <option value="5000">5 s</option>
+            <option value="10000" selected>10 s</option>
+            <option value="30000">30 s</option>
+          </select>
+        </label>
+      </section>
+
+      <section id="sensorsContainer"></section>
+    </section>
+
+    <!-- VISTA 2 -->
+    <section id="view-charts" class="view">
+      <!-- igual que ya lo tienes -->
+    </section>
+
+    <!-- VISTA 3 -->
+    <section id="view-calendar" class="view">
+      <!-- igual que ya lo tienes -->
+    </section>
+
+  </section>
+
+  <!-- POP-UP INACTIVIDAD (igual) -->
+  <section id="sessionWarningModal" class="modal-overlay" style="display: none;">
+    <div class="modal-box">
+      <h2>Sesión inactiva</h2>
+      <p>
+        No se ha detectado actividad. Serás desconectado en
+        <strong><span id="countdownSeconds">60</span> segundos</strong>.
+      </p>
+      <div class="modal-actions">
+        <button id="stayLoggedBtn">Seguir conectado</button>
+        <button id="logoutNowBtn" class="logout-btn">Cerrar sesión ahora</button>
+      </div>
+    </div>
+  </section>
+
+</main>
 
   <footer>
     <small>Proyecto creado por Vicente Becerra y Rodrigo Becerra – Contador de Personas para Tiendas Comerciales</small>
@@ -165,3 +139,4 @@
   <script src="app.js"></script>
 </body>
 </html>
+
