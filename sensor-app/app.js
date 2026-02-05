@@ -58,6 +58,10 @@ const historyResult = document.getElementById("historyResult");
 // ------------------------------
 let autoRefreshId = null;
 
+// ✅ Polling de estado (heartbeat)
+let statusPollId = null;
+const STATUS_POLL_MS = 3000; // cada 3 segundos
+
 let currentUser = null;
 let currentRole = null; // "admin" o "dueño"
 let currentStores = [];
@@ -243,6 +247,47 @@ if (stayLoggedBtn) stayLoggedBtn.addEventListener("click", () => resetInactivity
 if (logoutNowBtn) logoutNowBtn.addEventListener("click", () => logout());
 
 // ------------------------------
+// ✅ Polling estado (heartbeat)
+// ------------------------------
+function startStatusPolling() {
+  stopStatusPolling();
+  statusPollId = setInterval(() => refreshStatusOnly(), STATUS_POLL_MS);
+}
+
+function stopStatusPolling() {
+  if (statusPollId) {
+    clearInterval(statusPollId);
+    statusPollId = null;
+  }
+}
+
+async function refreshStatusOnly() {
+  if (!currentStoreId) return;
+
+  const statusPill = document.getElementById("statusPill");
+  const snEl = document.getElementById("sensorSn");
+  if (!statusPill || !snEl) return;
+
+  try {
+    const urlStatus = `${STATUS_URL}?storeId=${encodeURIComponent(currentStoreId)}`;
+    const res = await fetch(urlStatus);
+    if (!res.ok) return;
+
+    const status = await res.json();
+    const online = !!status?.online;
+    const sn = status?.sn || "SN desconocido";
+
+    snEl.innerHTML = `SN: <strong>${sn}</strong>`;
+
+    statusPill.classList.remove("status-on", "status-off");
+    statusPill.classList.add(online ? "status-on" : "status-off");
+    statusPill.textContent = online ? "🟢 Encendido" : "🔴 Apagado";
+  } catch (e) {
+    // no rompemos UI
+  }
+}
+
+// ------------------------------
 // Login
 // ------------------------------
 async function login() {
@@ -320,8 +365,15 @@ async function login() {
 
     resetInactivityTimers();
 
-    if (currentStoreId) loadSensors();
-    else sensorsContainer.innerHTML = "<p>No hay tiendas disponibles para este usuario.</p>";
+    // ✅ Arranca el polling del estado
+    startStatusPolling();
+
+    if (currentStoreId) {
+      await loadSensors();
+      refreshStatusOnly(); // fuerza primer update rápido
+    } else {
+      sensorsContainer.innerHTML = "<p>No hay tiendas disponibles para este usuario.</p>";
+    }
   } catch (err) {
     console.error(err);
     loginStatus.textContent = err.message || "No se pudo iniciar sesión.";
@@ -341,6 +393,9 @@ function logout() {
     clearInterval(autoRefreshId);
     autoRefreshId = null;
   }
+
+  // ✅ detener polling estado
+  stopStatusPolling();
 
   clearInactivityTimers();
   hideInactivityWarning();
@@ -379,8 +434,12 @@ if (clientSelect) {
     currentClientId = clientSelect.value;
     fillStoreSelectForClient(currentClientId);
 
-    if (currentStoreId) loadSensors();
-    else sensorsContainer.innerHTML = "<p>No hay tiendas asociadas a este cliente.</p>";
+    if (currentStoreId) {
+      loadSensors();
+      refreshStatusOnly();
+    } else {
+      sensorsContainer.innerHTML = "<p>No hay tiendas asociadas a este cliente.</p>";
+    }
   });
 }
 
@@ -388,6 +447,7 @@ if (storeSelect) {
   storeSelect.addEventListener("change", () => {
     currentStoreId = storeSelect.value;
     loadSensors();
+    refreshStatusOnly(); // ✅ cambia el pill altiro
   });
 }
 
@@ -417,8 +477,7 @@ async function loadSensors() {
     renderStoreCounters(counters, status);
   } catch (err) {
     console.error(err);
-    sensorsContainer.innerHTML =
-      `<p style="color:red;">No se pudieron cargar los datos de la tienda. Revisa el servidor.</p>`;
+    sensorsContainer.innerHTML = `<p style="color:red;">No se pudieron cargar los datos de la tienda. Revisa el servidor.</p>`;
   }
 }
 
@@ -458,8 +517,11 @@ function renderStoreCounters(counters, status) {
       </div>
 
       <div class="sensor-right">
-        <div class="sensor-sn">SN: <strong>${sn}</strong></div>
-        <div class="status-pill ${online ? "status-on" : "status-off"}">
+        <!-- ✅ ID para actualizar sin re-render -->
+        <div class="sensor-sn" id="sensorSn">SN: <strong>${sn}</strong></div>
+
+        <!-- ✅ ID para actualizar sin re-render -->
+        <div id="statusPill" class="status-pill ${online ? "status-on" : "status-off"}">
           ${online ? "🟢 Encendido" : "🔴 Apagado"}
         </div>
       </div>
@@ -489,7 +551,7 @@ function renderStoreCounters(counters, status) {
 }
 
 // ------------------------------
-// Historial / Gráfico (requiere /api/store/history)
+// Historial / Gráfico
 // ------------------------------
 async function fetchHistory(dateStr) {
   if (!currentStoreId) throw new Error("No hay tienda seleccionada.");
