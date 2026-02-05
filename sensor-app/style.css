@@ -106,10 +106,30 @@ header p { margin: 4px 0 0; opacity: 0.95; }
   margin: 0 auto;
 }
 
-/* Sidebar: NO sticky */
-.sidebar{
+/* ---------------- SIDEBAR ---------------- */
+.sidebar {
+  background: #d7dde5;
+  border-radius: 14px;
+  padding: 14px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+  border-left: 6px solid #1C6DD0;
+  height: fit-content;
+
+  /* NO sticky: no “sigue” al hacer scroll */
   position: relative;
   top: auto;
+}
+
+.sidebar-title {
+  font-weight: 800;
+  font-size: 1.05rem;
+  margin-bottom: 10px;
+}
+
+.sidebar-hint {
+  margin-top: 12px;
+  font-size: 0.9rem;
+  opacity: 0.8;
 }
 
 /* Usuario compacto dentro del sidebar */
@@ -133,6 +153,8 @@ header p { margin: 4px 0 0; opacity: 0.95; }
   min-width: 0;
 }
 
+.user-bar.user-bar-compact .user-icon { font-size: 16px; }
+
 .user-bar.user-bar-compact .user-name{
   font-weight: 900;
   font-size: 0.95rem;
@@ -152,18 +174,6 @@ header p { margin: 4px 0 0; opacity: 0.95; }
   padding: 7px 10px;
   border-radius: 10px;
   font-size: 0.9rem;
-}
-
-.sidebar-title {
-  font-weight: 800;
-  font-size: 1.05rem;
-  margin-bottom: 10px;
-}
-
-.sidebar-hint {
-  margin-top: 12px;
-  font-size: 0.9rem;
-  opacity: 0.8;
 }
 
 /* Botones menú */
@@ -291,52 +301,6 @@ button:not(.nav-btn):hover {
   gap: 16px;
 }
 
-/* ✅ Leyenda ON/OFF */
-.sensor-legend {
-  grid-column: 1 / -1;
-  display: flex;
-  gap: 14px;
-  align-items: center;
-  flex-wrap: wrap;
-  margin: 0 0 2px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: rgba(255,255,255,0.35);
-  border: 2px dashed rgba(28, 109, 208, 0.25);
-}
-
-.legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 900;
-}
-
-/* “Botoncito” pastilla */
-.status-pill {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 6px 10px;
-  border-radius: 999px;
-  font-weight: 900;
-  font-size: 0.85rem;
-  border: 2px solid rgba(0,0,0,0.15);
-  user-select: none;
-}
-
-.status-on {
-  background: rgba(46, 204, 113, 0.22);
-  border-color: rgba(46, 204, 113, 0.55);
-  color: #0A2342;
-}
-
-.status-off {
-  background: rgba(231, 76, 60, 0.22);
-  border-color: rgba(231, 76, 60, 0.55);
-  color: #0A2342;
-}
-
 /* ---------------- SENSOR CARD ---------------- */
 .sensor-card {
   background: #d7dde5;
@@ -355,22 +319,8 @@ button:not(.nav-btn):hover {
 .sensor-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
+  align-items: baseline;
   margin-bottom: 8px;
-}
-
-.sensor-right {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.sensor-sn {
-  font-size: 0.85rem;
-  opacity: 0.9;
 }
 
 .sensor-id { font-weight: 900; font-size: 1.1rem; }
@@ -473,4 +423,3 @@ footer {
   header h1 { font-size: 1.15rem; }
   .login-card { width: 92%; }
 }
-
