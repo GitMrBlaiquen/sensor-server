@@ -1,19 +1,16 @@
 // ================================
-// app.js (reescrito)
+// app.js (mínimo cambio)
 // ================================
 
 // URL base de la API
 const BASE_URL = window.location.origin;
-// const BASE_URL = "http://localhost:10000";
 
 const LOGIN_URL = `${BASE_URL}/api/login`;
 const COUNTERS_URL = `${BASE_URL}/api/store/counters`;
 const HISTORY_URL = `${BASE_URL}/api/store/history`;
 const STATUS_URL = `${BASE_URL}/api/store/status`;
 
-// ------------------------------
 // Elementos principales
-// ------------------------------
 const sensorsContainer = document.getElementById("sensorsContainer");
 const refreshBtn = document.getElementById("refreshBtn");
 const refreshSelect = document.getElementById("refreshInterval");
@@ -57,47 +54,36 @@ const historyDate = document.getElementById("historyDate");
 const loadHistoryBtn = document.getElementById("loadHistoryBtn");
 const historyResult = document.getElementById("historyResult");
 
-// ------------------------------
 // Estado
-// ------------------------------
 let autoRefreshId = null;
-
-// ✅ Polling de estado (heartbeat)
 let statusPollId = null;
-const STATUS_POLL_MS = 3000; // cada 3 segundos
+const STATUS_POLL_MS = 3000;
 
 let currentUser = null;
-let currentRole = null; // "admin" o "dueño"
+let currentRole = null;
 let currentStores = [];
 let currentStoreId = null;
 
-// Solo admin
 let clients = [];
 let currentClientId = null;
 
-// ------------------------------
 // Inactividad
-// ------------------------------
-const INACTIVITY_LIMIT_MS = 1 * 60 * 1000; // 1 minuto
-const WARNING_DURATION_MS = 30 * 1000; // 30 segundos
+const INACTIVITY_LIMIT_MS = 1 * 60 * 1000;
+const WARNING_DURATION_MS = 30 * 1000;
 
 let inactivityTimer = null;
 let logoutTimer = null;
 let countdownInterval = null;
 
-// ------------------------------
-// Utilidades: clientes/tiendas
-// ------------------------------
+// Utilidades
 function getClientIdFromStoreId(storeId) {
   const parts = String(storeId || "").split("-");
   return parts[0] || storeId;
 }
-
 function formatClientName(clientId) {
   if (!clientId) return "";
   return clientId.charAt(0).toUpperCase() + clientId.slice(1);
 }
-
 function buildClientsFromStores(stores) {
   const found = new Set();
   const list = [];
@@ -110,66 +96,43 @@ function buildClientsFromStores(stores) {
   });
   return list;
 }
-
 function fillClientSelect() {
   if (!clientSelect) return;
   clientSelect.innerHTML = "";
-
   clients.forEach((c) => {
     const opt = document.createElement("option");
     opt.value = c.id;
     opt.textContent = c.name;
     clientSelect.appendChild(opt);
   });
-
-  if (clients.length > 0) {
-    currentClientId = clients[0].id;
-    clientSelect.value = currentClientId;
-  } else {
-    currentClientId = null;
-  }
+  currentClientId = clients.length ? clients[0].id : null;
+  if (currentClientId) clientSelect.value = currentClientId;
 }
-
 function fillStoreSelectForClient(clientId) {
   if (!storeSelect) return;
   storeSelect.innerHTML = "";
-
   const filteredStores = currentStores.filter((s) => getClientIdFromStoreId(s.id) === clientId);
-
   filteredStores.forEach((store) => {
     const opt = document.createElement("option");
     opt.value = store.id;
     opt.textContent = store.name || store.id;
     storeSelect.appendChild(opt);
   });
-
-  if (filteredStores.length > 0) {
-    currentStoreId = filteredStores[0].id;
-    storeSelect.value = currentStoreId;
-  } else {
-    currentStoreId = null;
-  }
+  currentStoreId = filteredStores.length ? filteredStores[0].id : null;
+  if (currentStoreId) storeSelect.value = currentStoreId;
 }
-
 function fillStoreSelectSimple() {
   if (!storeSelect) return;
   storeSelect.innerHTML = "";
-
   currentStores.forEach((store) => {
     const opt = document.createElement("option");
     opt.value = store.id;
     opt.textContent = store.name || store.id;
     storeSelect.appendChild(opt);
   });
-
-  if (currentStores.length > 0) {
-    currentStoreId = currentStores[0].id;
-    storeSelect.value = currentStoreId;
-  } else {
-    currentStoreId = null;
-  }
+  currentStoreId = currentStores.length ? currentStores[0].id : null;
+  if (currentStoreId) storeSelect.value = currentStoreId;
 }
-
 function getStoreName(storeId) {
   let storeName = storeId;
   const found = (currentStores || []).find((s) => s.id === storeId);
@@ -177,9 +140,7 @@ function getStoreName(storeId) {
   return storeName;
 }
 
-// ------------------------------
-// Menú lateral: cambiar vista
-// ------------------------------
+// Menú
 function showView(viewId) {
   views.forEach((v) => v.classList.remove("active-view"));
   const el = document.getElementById(viewId);
@@ -189,7 +150,6 @@ function showView(viewId) {
   const btn = document.querySelector(`.nav-btn[data-view="${viewId}"]`);
   if (btn) btn.classList.add("active");
 }
-
 navButtons.forEach((btn) => {
   btn.addEventListener("click", () => {
     const viewId = btn.dataset.view;
@@ -197,9 +157,7 @@ navButtons.forEach((btn) => {
   });
 });
 
-// ------------------------------
 // Inactividad
-// ------------------------------
 function clearInactivityTimers() {
   clearTimeout(inactivityTimer);
   clearTimeout(logoutTimer);
@@ -208,13 +166,11 @@ function clearInactivityTimers() {
   logoutTimer = null;
   countdownInterval = null;
 }
-
 function hideInactivityWarning() {
   if (sessionWarningModal) sessionWarningModal.style.display = "none";
   clearInterval(countdownInterval);
   countdownInterval = null;
 }
-
 function showInactivityWarning() {
   if (!currentUser) return;
   if (!sessionWarningModal) return;
@@ -233,36 +189,29 @@ function showInactivityWarning() {
 
   logoutTimer = setTimeout(() => logout(), WARNING_DURATION_MS);
 }
-
 function resetInactivityTimers() {
   if (!currentUser) return;
   hideInactivityWarning();
   clearInactivityTimers();
   inactivityTimer = setTimeout(showInactivityWarning, INACTIVITY_LIMIT_MS);
 }
-
 ["click", "keydown", "mousemove", "scroll", "touchstart"].forEach((evt) => {
   document.addEventListener(evt, () => resetInactivityTimers(), { passive: true });
 });
-
 if (stayLoggedBtn) stayLoggedBtn.addEventListener("click", () => resetInactivityTimers());
 if (logoutNowBtn) logoutNowBtn.addEventListener("click", () => logout());
 
-// ------------------------------
-// ✅ Polling estado (heartbeat)
-// ------------------------------
+// Polling estado
 function startStatusPolling() {
   stopStatusPolling();
   statusPollId = setInterval(() => refreshStatusOnly(), STATUS_POLL_MS);
 }
-
 function stopStatusPolling() {
   if (statusPollId) {
     clearInterval(statusPollId);
     statusPollId = null;
   }
 }
-
 async function refreshStatusOnly() {
   if (!currentStoreId) return;
 
@@ -280,18 +229,13 @@ async function refreshStatusOnly() {
     const sn = status?.sn || "SN desconocido";
 
     snEl.innerHTML = `SN: <strong>${sn}</strong>`;
-
     statusPill.classList.remove("status-on", "status-off");
     statusPill.classList.add(online ? "status-on" : "status-off");
     statusPill.textContent = online ? "🟢 Encendido" : "🔴 Apagado";
-  } catch (e) {
-    // no rompemos UI
-  }
+  } catch {}
 }
 
-// ------------------------------
 // Login
-// ------------------------------
 async function login() {
   const username = (usernameInput?.value || "").trim();
   const password = (passwordInput?.value || "").trim();
@@ -366,7 +310,6 @@ async function login() {
     if (historyDate && !historyDate.value) historyDate.value = today;
 
     resetInactivityTimers();
-
     startStatusPolling();
 
     if (currentStoreId) {
@@ -386,15 +329,12 @@ if (loginBtn) loginBtn.addEventListener("click", login);
 if (usernameInput) usernameInput.addEventListener("keydown", (e) => e.key === "Enter" && login());
 if (passwordInput) passwordInput.addEventListener("keydown", (e) => e.key === "Enter" && login());
 
-// ------------------------------
 // Logout
-// ------------------------------
 function logout() {
   if (autoRefreshId) {
     clearInterval(autoRefreshId);
     autoRefreshId = null;
   }
-
   stopStatusPolling();
 
   clearInactivityTimers();
@@ -423,12 +363,9 @@ function logout() {
   if (mainContent) mainContent.style.display = "none";
   if (loginPanel) loginPanel.style.display = "flex";
 }
-
 if (logoutBtn) logoutBtn.addEventListener("click", logout);
 
-// ------------------------------
 // Selectores
-// ------------------------------
 if (clientSelect) {
   clientSelect.addEventListener("change", () => {
     currentClientId = clientSelect.value;
@@ -442,7 +379,6 @@ if (clientSelect) {
     }
   });
 }
-
 if (storeSelect) {
   storeSelect.addEventListener("change", () => {
     currentStoreId = storeSelect.value;
@@ -451,9 +387,7 @@ if (storeSelect) {
   });
 }
 
-// ------------------------------
-// Contador TIENDA + ESTADO (heartbeat)
-// ------------------------------
+// Load store
 async function loadSensors() {
   if (!currentStoreId) {
     sensorsContainer.innerHTML = "<p>Selecciona una tienda para ver los datos.</p>";
@@ -477,34 +411,27 @@ async function loadSensors() {
     renderStoreCounters(counters, status);
   } catch (err) {
     console.error(err);
-    sensorsContainer.innerHTML = `<p style="color:red;">No se pudieron cargar los datos de la tienda. Revisa el servidor.</p>`;
+    sensorsContainer.innerHTML =
+      `<p style="color:red;">No se pudieron cargar los datos de la tienda. Revisa el servidor.</p>`;
   }
 }
 
 function renderStoreCounters(counters, status) {
-  if (!counters) {
-    sensorsContainer.innerHTML = "<p>No hay datos disponibles aún.</p>";
-    return;
-  }
-
   const {
     storeId,
     entradas = 0,
     salidas = 0,
     dentro = 0,
-
-    // ✅ nuevos
     inChild = 0,
     outChild = 0,
     workcardCount = 0,
-  } = counters;
+  } = counters || {};
 
   const online = !!status?.online;
   const sn = status?.sn || "SN desconocido";
 
   sensorsContainer.innerHTML = "";
 
-  // Leyenda
   const legend = document.createElement("div");
   legend.className = "sensor-legend";
   legend.innerHTML = `
@@ -536,15 +463,15 @@ function renderStoreCounters(counters, status) {
 
     <div class="store-counters">
       <div class="store-counter-item">
-        <span class="label">Personas que han ENTRADO</span>
+        <span class="label">Clientes que han ENTRADO</span>
         <span class="value">${entradas}</span>
       </div>
       <div class="store-counter-item">
-        <span class="label">Personas que han SALIDO</span>
+        <span class="label">Clientes que han SALIDO</span>
         <span class="value">${salidas}</span>
       </div>
       <div class="store-counter-item">
-        <span class="label">Personas DENTRO de la tienda</span>
+        <span class="label">Clientes DENTRO (estimado)</span>
         <span class="value">${dentro}</span>
       </div>
 
@@ -572,9 +499,7 @@ function renderStoreCounters(counters, status) {
   sensorsContainer.appendChild(card);
 }
 
-// ------------------------------
-// Historial / Gráfico
-// ------------------------------
+// Historial/Gráfico (igual que antes) ------------------------------
 async function fetchHistory(dateStr) {
   if (!currentStoreId) throw new Error("No hay tienda seleccionada.");
   if (!dateStr) throw new Error("Selecciona una fecha.");
@@ -606,9 +531,9 @@ async function loadHistory() {
 
     historyResult.innerHTML = `
       <h3>${storeName} — ${data.date}</h3>
-      <p><strong>Entradas:</strong> ${entradas}</p>
-      <p><strong>Salidas:</strong> ${salidas}</p>
-      <p><strong>Dentro (estimado):</strong> ${dentro}</p>
+      <p><strong>Clientes (entradas):</strong> ${entradas}</p>
+      <p><strong>Clientes (salidas):</strong> ${salidas}</p>
+      <p><strong>Clientes dentro (estimado):</strong> ${dentro}</p>
       <hr/>
       <p><strong>Niños (entrada):</strong> ${inChild}</p>
       <p><strong>Niños (salida):</strong> ${outChild}</p>
@@ -658,10 +583,7 @@ function drawSimpleChart(byHour, dateStr) {
 
   const maxY = Math.max(1, ...pointsE, ...pointsS);
 
-  const padL = 50,
-    padR = 15,
-    padT = 20,
-    padB = 45;
+  const padL = 50, padR = 15, padT = 20, padB = 45;
   const plotW = W - padL - padR;
   const plotH = H - padT - padB;
 
@@ -681,7 +603,6 @@ function drawSimpleChart(byHour, dateStr) {
   const xAt = (i) => padL + (i / 23) * plotW;
   const yAt = (v) => padT + plotH - (v / maxY) * plotH;
 
-  // Entradas
   chartCtx.strokeStyle = "#1C6DD0";
   chartCtx.lineWidth = 2;
   chartCtx.beginPath();
@@ -693,7 +614,6 @@ function drawSimpleChart(byHour, dateStr) {
   });
   chartCtx.stroke();
 
-  // Salidas
   chartCtx.strokeStyle = "#c0392b";
   chartCtx.lineWidth = 2;
   chartCtx.beginPath();
@@ -716,20 +636,16 @@ function drawSimpleChart(byHour, dateStr) {
 if (loadHistoryBtn) loadHistoryBtn.addEventListener("click", loadHistory);
 if (loadChartBtn) loadChartBtn.addEventListener("click", loadChart);
 
-// ------------------------------
 // Controles generales
-// ------------------------------
 if (refreshBtn) refreshBtn.addEventListener("click", () => loadSensors());
 
 if (refreshSelect) {
   refreshSelect.addEventListener("change", () => {
     const interval = Number(refreshSelect.value);
-
     if (autoRefreshId) {
       clearInterval(autoRefreshId);
       autoRefreshId = null;
     }
-
     if (interval > 0) {
       autoRefreshId = setInterval(() => loadSensors(), interval);
     }
