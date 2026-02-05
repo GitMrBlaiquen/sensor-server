@@ -1,3 +1,6 @@
+// ================================
+// server.js (reescrito)
+// ================================
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
@@ -92,22 +95,33 @@ app.post("/api/login", (req, res) => {
 const sensors = {};
 
 // Contadores “en vivo”
-const storeCounters = {}; // { storeId: { entradas, salidas } }
+const storeCounters = {}; // { storeId: {...} }
 
 // Historial por día (resumen)
-const dailyCounters = {}; // { storeId: { "YYYY-MM-DD": { entradas, salidas } } }
+const dailyCounters = {}; // { storeId: { "YYYY-MM-DD": {...} } }
 
 // Historial por hora del día (para gráfico)
-const hourlyCounters = {};
-// { storeId: { "YYYY-MM-DD": { "00":{entradas,salidas}, ..., "23":{entradas,salidas} } } }
+const hourlyCounters = {}; // { storeId: { "YYYY-MM-DD": { "00":{...}, ... } } }
 
 function safeNumber(v, fallback = 0) {
   const n = Number(v);
   return Number.isFinite(n) ? n : fallback;
 }
 
+function emptyCounters() {
+  return {
+    entradas: 0,
+    salidas: 0,
+
+    // ✅ nuevos
+    inChild: 0,
+    outChild: 0,
+    workcardCount: 0, // trabajadores detectados con tarjeta (NO in/out)
+  };
+}
+
 function ensureStore(storeId) {
-  if (!storeCounters[storeId]) storeCounters[storeId] = { entradas: 0, salidas: 0 };
+  if (!storeCounters[storeId]) storeCounters[storeId] = emptyCounters();
   if (!dailyCounters[storeId]) dailyCounters[storeId] = {};
   if (!hourlyCounters[storeId]) hourlyCounters[storeId] = {};
 }
@@ -116,14 +130,14 @@ function ensureDay(storeId, dateKey) {
   ensureStore(storeId);
 
   if (!dailyCounters[storeId][dateKey]) {
-    dailyCounters[storeId][dateKey] = { entradas: 0, salidas: 0 };
+    dailyCounters[storeId][dateKey] = emptyCounters();
   }
 
   if (!hourlyCounters[storeId][dateKey]) {
     hourlyCounters[storeId][dateKey] = {};
     for (let h = 0; h < 24; h++) {
       const hh = String(h).padStart(2, "0");
-      hourlyCounters[storeId][dateKey][hh] = { entradas: 0, salidas: 0 };
+      hourlyCounters[storeId][dateKey][hh] = emptyCounters();
     }
   }
 }
@@ -141,15 +155,23 @@ function hourKeyFromTs(ts = Date.now()) {
   return String(d.getHours()).padStart(2, "0");
 }
 
-function addDelta(storeId, deltaE, deltaS, ts = Date.now()) {
-  const e = safeNumber(deltaE, 0);
-  const s = safeNumber(deltaS, 0);
-
+// ✅ ahora addDelta recibe un objeto delta
+// delta = { entradas, salidas, inChild, outChild, workcardCount }
+function addDelta(storeId, delta, ts = Date.now()) {
   ensureStore(storeId);
+
+  const e = safeNumber(delta?.entradas, 0);
+  const s = safeNumber(delta?.salidas, 0);
+  const inChild = safeNumber(delta?.inChild, 0);
+  const outChild = safeNumber(delta?.outChild, 0);
+  const workcardCount = safeNumber(delta?.workcardCount, 0);
 
   // vivo
   storeCounters[storeId].entradas += e;
   storeCounters[storeId].salidas += s;
+  storeCounters[storeId].inChild += inChild;
+  storeCounters[storeId].outChild += outChild;
+  storeCounters[storeId].workcardCount += workcardCount;
 
   // diario + hora
   const dateKey = dateKeyFromTs(ts);
@@ -159,9 +181,15 @@ function addDelta(storeId, deltaE, deltaS, ts = Date.now()) {
 
   dailyCounters[storeId][dateKey].entradas += e;
   dailyCounters[storeId][dateKey].salidas += s;
+  dailyCounters[storeId][dateKey].inChild += inChild;
+  dailyCounters[storeId][dateKey].outChild += outChild;
+  dailyCounters[storeId][dateKey].workcardCount += workcardCount;
 
   hourlyCounters[storeId][dateKey][hourKey].entradas += e;
   hourlyCounters[storeId][dateKey][hourKey].salidas += s;
+  hourlyCounters[storeId][dateKey][hourKey].inChild += inChild;
+  hourlyCounters[storeId][dateKey][hourKey].outChild += outChild;
+  hourlyCounters[storeId][dateKey][hourKey].workcardCount += workcardCount;
 
   const entradasDia = dailyCounters[storeId][dateKey].entradas;
   const salidasDia = dailyCounters[storeId][dateKey].salidas;
@@ -173,16 +201,10 @@ function addDelta(storeId, deltaE, deltaS, ts = Date.now()) {
 // --------------------------------------------------------------
 // MAPEO: 1 SENSOR REAL (SN) = 1 TIENDA
 // --------------------------------------------------------------
-// ✅ Tú confirmaste que este SN es el de la demo:
-//    221000002507152508
-// Lo dejo mapeado a arrow-01 para la demo.
 const DEVICE_TO_STORE = {
   "221000002507152508": "arrow-01",
   "211000002507152051": "arrow-02",
   "211000002507152052": "arrow-03",
-
-  // Si tienes otro sensor, lo agregas aquí:
-  // "211000002507152051": "arrow-02",
 };
 
 function getStoreIdFromDevice(sn) {
@@ -191,7 +213,6 @@ function getStoreIdFromDevice(sn) {
 }
 
 function getSnFromStoreId(storeId) {
-  // Busca el primer SN que apunte a esa tienda (como tienes 1 SN por tienda, sirve perfecto)
   const entries = Object.entries(DEVICE_TO_STORE);
   const found = entries.find(([, sId]) => sId === storeId);
   return found ? found[0] : null;
@@ -208,6 +229,7 @@ function okSensor(res, extraData = {}) {
   });
 }
 
+// ✅ lee in/out + inChild/outChild + workcard por attributes
 function normalizeCounts(body) {
   const entradas = safeNumber(
     body.in ?? body.enter ?? body.Enter ?? body.In ?? body.inNum ?? body.InNum ?? 0,
@@ -219,7 +241,17 @@ function normalizeCounts(body) {
     0
   );
 
-  return { entradas, salidas };
+  const inChild = safeNumber(body.inChild ?? body.InChild ?? 0, 0);
+  const outChild = safeNumber(body.outChild ?? body.OutChild ?? 0, 0);
+
+  // ✅ trabajadores por tarjeta: NO es in/out, solo “cuántos workcard=1 vinieron en este upload”
+  const attrs = Array.isArray(body.attributes) ? body.attributes : [];
+  let workcardCount = 0;
+  for (const a of attrs) {
+    if (Number(a?.workcard || 0) === 1) workcardCount += 1;
+  }
+
+  return { entradas, salidas, inChild, outChild, workcardCount };
 }
 
 // --------------------------------------------------------------
@@ -283,7 +315,6 @@ app.get("/api/store/status", (req, res) => {
 });
 
 // ---------------- DISPLAY POR SN (para pantallas demo) ----------------
-// GET /api/display?sn=221000002507152508
 app.get("/api/display", (req, res) => {
   const sn = String(req.query.sn || "");
   if (!sn) return res.status(400).json({ error: "Falta sn" });
@@ -292,10 +323,19 @@ app.get("/api/display", (req, res) => {
   if (!storeId) return res.status(404).json({ error: "SN no mapeado", sn });
 
   ensureStore(storeId);
-  const { entradas, salidas } = storeCounters[storeId];
-  const dentro = Math.max(entradas - salidas, 0);
+  const c = storeCounters[storeId];
+  const dentro = Math.max(c.entradas - c.salidas, 0);
 
-  res.json({ sn, storeId, entradas, salidas, dentro });
+  res.json({
+    sn,
+    storeId,
+    entradas: c.entradas,
+    salidas: c.salidas,
+    dentro,
+    inChild: c.inChild,
+    outChild: c.outChild,
+    workcardCount: c.workcardCount,
+  });
 });
 
 // --------------------------------------------------------------
@@ -321,12 +361,15 @@ app.post("/api/sensors/data", (req, res) => {
     lastUpdate: now,
   };
 
-  let dE = 0;
-  let dS = 0;
-  if (type === "entrada") dE = safeValue;
-  else if (type === "salida") dS = safeValue;
+  const delta = {
+    entradas: type === "entrada" ? safeValue : 0,
+    salidas: type === "salida" ? safeValue : 0,
+    inChild: 0,
+    outChild: 0,
+    workcardCount: 0,
+  };
 
-  const result = addDelta(storeId, dE, dS, Date.now());
+  const result = addDelta(storeId, delta, Date.now());
   console.log("🧪 Simulador:", sensorKey, "=>", result);
 
   return res.json({ status: "ok" });
@@ -345,7 +388,6 @@ app.post("/api/camera/heartBeat", (req, res) => {
 
   console.log("❤️ heartBeat:", { from: req.ip, sn, online: sn ? isOnlineBySn(sn) : false });
 
-  // Ajustable: cada cuántos minutos manda data
   return okSensor(res, { uploadInterval: 1, dataMode: "Add" });
 });
 
@@ -354,12 +396,10 @@ app.post("/api/camera/dataUpload", (req, res) => {
   const sn = body.sn;
   const storeId = getStoreIdFromDevice(sn);
 
-  // si por algún motivo no llega heartBeat, al menos dataUpload lo marca como “vivo”
   if (sn) lastHeartbeatBySn[String(sn)] = Date.now();
 
   console.log("📦 dataUpload:", { from: req.ip, sn, storeId });
 
-  // Guardar debug del payload siempre
   const sensorKey = `${storeId || "unknown"}:SN:${sn || "no-sn"}`;
   sensors[sensorKey] = {
     storeId: storeId || null,
@@ -376,12 +416,15 @@ app.post("/api/camera/dataUpload", (req, res) => {
     return okSensor(res);
   }
 
-  const { entradas, salidas } = normalizeCounts(body);
+  const delta = normalizeCounts(body);
+  const result = addDelta(storeId, delta, Date.now());
 
-  // IMPORTANTE: asumimos que el sensor manda DELTAS (modo Add)
-  const result = addDelta(storeId, entradas, salidas, Date.now());
+  console.log(
+    `✅ ${storeId} (SN ${sn}) +E ${delta.entradas} +S ${delta.salidas} ` +
+      `+NiñosE ${delta.inChild} +NiñosS ${delta.outChild} +WorkCard ${delta.workcardCount} =>`,
+    result
+  );
 
-  console.log(`✅ ${storeId} (SN ${sn}) +E ${entradas} +S ${salidas} =>`, result);
   return okSensor(res);
 });
 
@@ -393,10 +436,18 @@ app.get("/api/store/counters", (req, res) => {
   if (!storeId) return res.status(400).json({ error: "Falta storeId en la query" });
 
   ensureStore(storeId);
-  const { entradas, salidas } = storeCounters[storeId];
-  const dentro = Math.max(entradas - salidas, 0);
+  const c = storeCounters[storeId];
+  const dentro = Math.max(c.entradas - c.salidas, 0);
 
-  res.json({ storeId, entradas, salidas, dentro });
+  res.json({
+    storeId,
+    entradas: c.entradas,
+    salidas: c.salidas,
+    dentro,
+    inChild: c.inChild,
+    outChild: c.outChild,
+    workcardCount: c.workcardCount,
+  });
 });
 
 app.get("/api/store/days", (req, res) => {
@@ -415,11 +466,24 @@ app.get("/api/store/history", (req, res) => {
 
   ensureDay(storeId, date);
 
-  const { entradas, salidas } = dailyCounters[storeId][date];
-  const dentro = Math.max(entradas - salidas, 0);
+  const d = dailyCounters[storeId][date];
+  const dentro = Math.max(d.entradas - d.salidas, 0);
   const byHour = hourlyCounters[storeId][date] || {};
 
-  res.json({ storeId, date, entradas, salidas, dentro, byHour });
+  res.json({
+    storeId,
+    date,
+    entradas: d.entradas,
+    salidas: d.salidas,
+    dentro,
+
+    // ✅ nuevos en resumen
+    inChild: d.inChild,
+    outChild: d.outChild,
+    workcardCount: d.workcardCount,
+
+    byHour,
+  });
 });
 
 // Debug / utilidades
@@ -435,5 +499,3 @@ const PORT = process.env.PORT || 10000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Servidor TIENDAS activo en el puerto ${PORT}`);
 });
-
-
