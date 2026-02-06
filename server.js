@@ -256,42 +256,40 @@ function okSensor(res, extraData = {}) {
  * - Clientes = Adultos - Workers (niños ya no cuentan)
  */
 function normalizeCounts(body) {
-  const totalEntradas = safeNumber(body.in ?? 0, 0);
-  const totalSalidas = safeNumber(body.out ?? 0, 0);
+  const totalEntradas = safeNumber(body.in ?? body.enter ?? body.Enter ?? body.In ?? body.inNum ?? body.InNum ?? 0, 0);
+  const totalSalidas  = safeNumber(body.out ?? body.leave ?? body.Leave ?? body.Out ?? body.outNum ?? body.OutNum ?? 0, 0);
 
-  const inChild = safeNumber(body.inChild ?? 0, 0);
-  const outChild = safeNumber(body.outChild ?? 0, 0);
+  const inChild  = safeNumber(body.inChild ?? body.InChild ?? 0, 0);
+  const outChild = safeNumber(body.outChild ?? body.OutChild ?? 0, 0);
 
-  // Adultos (ideal)
-  const adultIn = safeNumber(body.inAdult ?? (totalEntradas - inChild), 0);
-  const adultOut = safeNumber(body.outAdult ?? (totalSalidas - outChild), 0);
+  // Mejor usar adultos directo si viene
+  const inAdult  = safeNumber(body.inAdult  ?? (totalEntradas - inChild), 0);
+  const outAdult = safeNumber(body.outAdult ?? (totalSalidas  - outChild), 0);
 
-  // workers por workcard dentro de attributes
+  // workers = cantidad de personas marcadas con workcard=1 en attributes
   const attrs = Array.isArray(body.attributes) ? body.attributes : [];
-  const workers = attrs.reduce((acc, item) => acc + (safeNumber(item?.workcard, 0) ? 1 : 0), 0);
+  const workers = attrs.reduce((acc, a) => acc + (Number(a?.workcard || 0) === 1 ? 1 : 0), 0);
 
-  // repartir workers entre in/out
-  const { wIn, wOut } = splitWorkers(adultIn, adultOut, workers);
+  // ✅ CLAVE: como workcard no trae dirección, ese trabajador puede explicar 1 IN y 1 OUT del intervalo
+  const workersToRemoveFromIn  = Math.min(workers, inAdult);
+  const workersToRemoveFromOut = Math.min(workers, outAdult);
 
-  // ✅ Clientes (adultos sin workers; niños aparte)
-  const entradasClientes = Math.max(adultIn - wIn, 0);
-  const salidasClientes = Math.max(adultOut - wOut, 0);
+  // ✅ CLIENTES = Adultos - Workers (Niños NO son clientes)
+  const entradasClientes = Math.max(inAdult  - workersToRemoveFromIn, 0);
+  const salidasClientes  = Math.max(outAdult - workersToRemoveFromOut, 0);
 
   return {
     totalEntradas,
     totalSalidas,
 
+    // ✅ lo que verá el usuario como CLIENTES
     entradas: entradasClientes,
     salidas: salidasClientes,
 
+    // ✅ extras separados
     inChild,
     outChild,
-
-    // workcard total del periodo (lo mostramos aparte)
-    workersIn: workers,
-
-    // debug opcional
-    _debug: { adultIn, adultOut, workers, wIn, wOut },
+    workersIn: workers, // “trabajadores detectados” (por workcard)
   };
 }
 
@@ -425,3 +423,4 @@ const PORT = process.env.PORT || 10000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Servidor TIENDAS activo en el puerto ${PORT}`);
 });
+
