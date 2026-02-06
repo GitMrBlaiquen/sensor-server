@@ -87,38 +87,37 @@ app.post("/api/login", (req, res) => {
 // --------------------------------------------------------------
 // -----------   CONTADOR + HISTORIAL POR TIENDA   --------------
 // --------------------------------------------------------------
-const sensors = {}; // debug
+const sensors = {}; // debug últimos payloads
 
-// ✅ Ahora guardamos:
-// - totalEntradas/totalSalidas (RAW del sensor)
-// - entradas/salidas = CLIENTES (ya restado workcard de entradas)
-// - workersIn = trabajadores entraron (por workcard)
+function safeNumber(v, fallback = 0) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+// ✅ Guardamos:
+// - totalIn/totalOut (RAW del sensor)
+// - entradas/salidas = CLIENTES (adultos sin workers, sin niños)
+// - workersIn = total workers detectados (workcard) (no tiene dirección real)
 // - niños in/out
 function emptyCounters() {
   return {
-    // RAW del sensor
     totalEntradas: 0,
     totalSalidas: 0,
 
-    // ✅ clientes (lo que verá el usuario)
+    // ✅ CLIENTES
     entradas: 0,
     salidas: 0,
 
     // extras
     inChild: 0,
     outChild: 0,
-    workersIn: 0, // ✅ trabajadores que entraron (workcard)
+    workersIn: 0, // aquí guardamos el total workcard detectado (por periodo)
   };
 }
 
-const storeCounters = {}; // vivo
-const dailyCounters = {}; // por día
-const hourlyCounters = {}; // por hora
-
-function safeNumber(v, fallback = 0) {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : fallback;
-}
+const storeCounters = {};
+const dailyCounters = {};
+const hourlyCounters = {};
 
 function ensureStore(storeId) {
   if (!storeCounters[storeId]) storeCounters[storeId] = emptyCounters();
@@ -155,15 +154,46 @@ function hourKeyFromTs(ts = Date.now()) {
   return String(d.getHours()).padStart(2, "0");
 }
 
-// delta: { totalEntradas, totalSalidas, entradas, salidas, inChild, outChild, workersIn }
+/**
+ * ✅ Reparte workers (workcard) entre IN / OUT.
+ * Como workcard NO trae dirección, lo más sano es repartir proporcionalmente
+ * a los adultos IN/OUT del payload.
+ */
+function splitWorkers(adultIn, adultOut, workers) {
+  const aIn = safeNumber(adultIn, 0);
+  const aOut = safeNumber(adultOut, 0);
+  const w = Math.max(0, safeNumber(workers, 0));
+
+  const sum = aIn + aOut;
+
+  if (w <= 0) return { wIn: 0, wOut: 0 };
+  if (sum <= 0) return { wIn: 0, wOut: 0 };
+
+  if (aIn > 0 && aOut === 0) return { wIn: w, wOut: 0 };
+  if (aOut > 0 && aIn === 0) return { wIn: 0, wOut: w };
+
+  const wIn = Math.round((w * aIn) / sum);
+  const wOut = w - wIn;
+  return { wIn, wOut };
+}
+
+/**
+ * delta = {
+ *  totalEntradas,totalSalidas,
+ *  entradas,salidas (CLIENTES),
+ *  inChild,outChild,workersIn
+ * }
+ */
 function addDelta(storeId, delta, ts = Date.now()) {
   ensureStore(storeId);
 
   const d = {
     totalEntradas: safeNumber(delta.totalEntradas, 0),
     totalSalidas: safeNumber(delta.totalSalidas, 0),
+
     entradas: safeNumber(delta.entradas, 0),
     salidas: safeNumber(delta.salidas, 0),
+
     inChild: safeNumber(delta.inChild, 0),
     outChild: safeNumber(delta.outChild, 0),
     workersIn: safeNumber(delta.workersIn, 0),
@@ -216,44 +246,52 @@ function okSensor(res, extraData = {}) {
   });
 }
 
+/**
+ * ✅ NORMALIZADOR NUEVO (CORRIGE EL BUG)
+ * - Toma totalIn/totalOut RAW
+ * - Toma niños in/out
+ * - Toma adultos in/out (mejor: inAdult/outAdult)
+ * - Cuenta workers desde attributes[].workcard
+ * - Reparte workers entre IN/OUT y los resta en ambos
+ * - Clientes = Adultos - Workers (niños ya no cuentan)
+ */
 function normalizeCounts(body) {
-  const totalEntradas = safeNumber(
-    body.in ?? body.enter ?? body.Enter ?? body.In ?? body.inNum ?? body.InNum ?? 0,
-    0
-  );
+  const totalEntradas = safeNumber(body.in ?? 0, 0);
+  const totalSalidas = safeNumber(body.out ?? 0, 0);
 
-  const totalSalidas = safeNumber(
-    body.out ?? body.leave ?? body.Leave ?? body.Out ?? body.outNum ?? body.OutNum ?? 0,
-    0
-  );
+  const inChild = safeNumber(body.inChild ?? 0, 0);
+  const outChild = safeNumber(body.outChild ?? 0, 0);
 
-  const inChild = safeNumber(body.inChild ?? body.InChild ?? 0, 0);
-  const outChild = safeNumber(body.outChild ?? body.OutChild ?? 0, 0);
+  // Adultos (ideal)
+  const adultIn = safeNumber(body.inAdult ?? (totalEntradas - inChild), 0);
+  const adultOut = safeNumber(body.outAdult ?? (totalSalidas - outChild), 0);
 
+  // workers por workcard dentro de attributes
   const attrs = Array.isArray(body.attributes) ? body.attributes : [];
+  const workers = attrs.reduce((acc, item) => acc + (safeNumber(item?.workcard, 0) ? 1 : 0), 0);
 
-  // ✅ workcard: 1 por trabajador (solo entrada)
-  let workersIn = 0;
-  for (const a of attrs) {
-    if (Number(a?.workcard || 0) === 1) workersIn += 1;
-  }
+  // repartir workers entre in/out
+  const { wIn, wOut } = splitWorkers(adultIn, adultOut, workers);
 
-  // ✅ CLIENTES = total - niños - trabajadores
-  const entradasClientes = Math.max(totalEntradas - inChild - workersIn, 0);
-
-  // ✅ salidasClientes = totalSalidas - niños que salieron (trabajadores no afectan out)
-  const salidasClientes = Math.max(totalSalidas - outChild, 0);
+  // ✅ Clientes (adultos sin workers; niños aparte)
+  const entradasClientes = Math.max(adultIn - wIn, 0);
+  const salidasClientes = Math.max(adultOut - wOut, 0);
 
   return {
     totalEntradas,
     totalSalidas,
 
-    entradas: entradasClientes, // clientes
-    salidas: salidasClientes,   // clientes
+    entradas: entradasClientes,
+    salidas: salidasClientes,
 
     inChild,
     outChild,
-    workersIn,
+
+    // workcard total del periodo (lo mostramos aparte)
+    workersIn: workers,
+
+    // debug opcional
+    _debug: { adultIn, adultOut, workers, wIn, wOut },
   };
 }
 
@@ -309,6 +347,7 @@ app.post("/api/camera/dataUpload", (req, res) => {
 
   if (sn) lastHeartbeatBySn[String(sn)] = Date.now();
 
+  // debug payload
   const sensorKey = `${storeId || "unknown"}:SN:${sn || "no-sn"}`;
   sensors[sensorKey] = {
     storeId: storeId || null,
@@ -323,8 +362,9 @@ app.post("/api/camera/dataUpload", (req, res) => {
   const delta = normalizeCounts(body);
   addDelta(storeId, delta, Date.now());
 
+  // Log útil para validar
   console.log(
-    `✅ ${storeId} SN=${sn} | totalIn=${delta.totalEntradas} workersIn=${delta.workersIn} => clientesIn=${delta.entradas} | out=${delta.salidas}`
+    `✅ ${storeId} SN=${sn} | RAW in=${delta.totalEntradas} out=${delta.totalSalidas} | child in=${delta.inChild} out=${delta.outChild} | workers=${delta.workersIn} | CLIENTS in=${delta.entradas} out=${delta.salidas}`
   );
 
   return okSensor(res);
@@ -345,7 +385,7 @@ app.get("/api/store/counters", (req, res) => {
   res.json({
     storeId,
 
-    // ✅ lo que mostrarás como CLIENTES
+    // ✅ CLIENTES
     entradas: c.entradas,
     salidas: c.salidas,
     dentro: dentroClientes,
@@ -355,7 +395,7 @@ app.get("/api/store/counters", (req, res) => {
     outChild: c.outChild,
     workersIn: c.workersIn,
 
-    // ✅ para debug (por si quieres verlo)
+    // ✅ debug
     totalEntradas: c.totalEntradas,
     totalSalidas: c.totalSalidas,
   });
@@ -378,9 +418,10 @@ app.get("/api/store/history", (req, res) => {
 
 // Debug
 app.get("/api/sensors", (req, res) => res.json(Object.values(sensors)));
+app.get("/api/debug/heartbeat", (req, res) => res.json(lastHeartbeatBySn));
 
+// ---------------- START ----------------
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Servidor TIENDAS activo en el puerto ${PORT}`);
 });
-
