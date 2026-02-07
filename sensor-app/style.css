@@ -97,34 +97,38 @@ header p { margin: 4px 0 0; opacity: 0.95; }
 }
 
 /* =========================================================
-   APP LAYOUT NUEVO (mini sidebar + user badge derecha)
+   APP LAYOUT (contenido deja espacio al menú fijo)
    ========================================================= */
 .app-shell {
-  display: grid;
-  grid-template-columns: 64px 1fr; /* ✅ menu angosto + contenido */
-  gap: 14px;
+  display: block;
   padding: 16px 18px 40px;
   max-width: 1400px;
   margin: 0 auto;
-  position: relative;
+
+  /* ✅ deja espacio al menú fijo izquierdo (64px + margen) */
+  padding-left: 96px;
 }
 
-/* ✅ Barra usuario arriba derecha, compacta */
+/* =========================================================
+   ✅ USER BADGE PEGADO AL BORDE DERECHO (FIXED)
+   ========================================================= */
 .user-badge {
-  position: absolute;
-  top: 12px;
-  right: 12px;
+  position: fixed;
+  top: 12px;      /* ✅ ajusta si quieres más arriba/abajo */
+  right: 0;       /* ✅ pegado al borde derecho */
+  z-index: 200;
+
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 
-  background: rgba(255,255,255,0.65);
+  background: rgba(255,255,255,0.75);
   border-left: 5px solid #1C6DD0;
-  border-radius: 12px;
+  border-top-left-radius: 12px;
+  border-bottom-left-radius: 12px;
   padding: 8px 10px;
 
-  box-shadow: 0 6px 16px rgba(0,0,0,0.08);
-  z-index: 50;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.10);
 }
 
 .user-badge #userInfo{
@@ -132,32 +136,46 @@ header p { margin: 4px 0 0; opacity: 0.95; }
   align-items: center;
   gap: 6px;
   white-space: nowrap;
-  max-width: 240px;
+  max-width: 210px;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-size: 0.92rem;
 }
 
 .logout-btn.logout-btn--mini {
   padding: 6px 10px !important;
   border-radius: 10px;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
 }
 
-/* ---------------- SIDEBAR MINI ---------------- */
-.sidebar {
-  background: #d7dde5;
-  border-radius: 14px;
+/* =========================================================
+   ✅ SIDEBAR MINI PEGADO AL BORDE IZQUIERDO (FIXED)
+   ========================================================= */
+.sidebar--mini {
+  position: fixed;
+  top: 120px;  /* ✅ debajo del header (ajusta si tu header cambia) */
+  left: 0;     /* ✅ pegado al borde izquierdo */
+  z-index: 150;
+
+  width: 64px;
   padding: 10px 8px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
-  border-left: 6px solid #1C6DD0;
+  border-top-right-radius: 14px;
+  border-bottom-right-radius: 14px;
+
+  background: #d7dde5;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.10);
+  border-left: 0;
+  border-right: 6px solid #1C6DD0;
+
   height: fit-content;
-  position: relative;
-  top: auto;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 /* Botones menú (solo icono) */
 .nav-btn {
-  width: 100%;
   border: none;
   cursor: pointer;
   font-weight: 900;
@@ -188,7 +206,7 @@ header p { margin: 4px 0 0; opacity: 0.95; }
   box-shadow: 0 4px 10px rgba(28, 109, 208, 0.35);
 }
 
-/* ✅ Tooltip bonito (sin JS) */
+/* Tooltip */
 .nav-btn[data-tip]{
   position: relative;
 }
@@ -229,13 +247,16 @@ header p { margin: 4px 0 0; opacity: 0.95; }
   opacity: 1;
 }
 
-/* Para que en móvil no moleste */
 @media (max-width: 700px) {
   .nav-btn[data-tip]::after,
   .nav-btn[data-tip]::before { display: none; }
 }
 
-.content { min-width: 0; padding-top: 56px; } /* ✅ espacio para que no tape user-badge */
+/* ---------------- CONTENIDO ---------------- */
+.content {
+  min-width: 0;
+  padding-top: 0;
+}
 
 /* ---------------- SELECTORES ---------------- */
 .client-selector,
@@ -343,7 +364,6 @@ button:not(.nav-btn):hover {
   background: transparent;
 }
 
-/* En el contenedor de sensores solo una columna */
 #sensorsContainer {
   display: grid;
   grid-template-columns: 1fr;
@@ -467,8 +487,8 @@ footer {
 }
 
 @media (max-width: 900px) {
-  .app-shell { grid-template-columns: 64px 1fr; }
-  .content { padding-top: 64px; }
+  .app-shell { padding-left: 88px; }
+  .sidebar--mini { top: 110px; }
 }
 
 @media (max-width: 420px) {
@@ -476,4 +496,21 @@ footer {
   .logo { height: 54px; }
   header h1 { font-size: 1.15rem; }
   .login-card { width: 92%; }
+
+  .user-badge{
+    top: 8px;
+    right: 0;
+    transform: scale(0.95);
+    transform-origin: top right;
+  }
+
+  .sidebar--mini{
+    top: 92px;
+    width: 60px;
+  }
+
+  .app-shell{
+    padding-left: 82px;
+    padding-right: 12px;
+  }
 }
