@@ -96,100 +96,85 @@ header p { margin: 4px 0 0; opacity: 0.95; }
   100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-/* ---------------- APP LAYOUT ---------------- */
+/* =========================================================
+   APP LAYOUT NUEVO (mini sidebar + user badge derecha)
+   ========================================================= */
 .app-shell {
   display: grid;
-  grid-template-columns: 240px 1fr;
-  gap: 16px;
-  padding: 16px 24px 40px;
-  max-width: 1200px;
+  grid-template-columns: 64px 1fr; /* ✅ menu angosto + contenido */
+  gap: 14px;
+  padding: 16px 18px 40px;
+  max-width: 1400px;
   margin: 0 auto;
+  position: relative;
 }
 
-/* ---------------- SIDEBAR ---------------- */
+/* ✅ Barra usuario arriba derecha, compacta */
+.user-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  background: rgba(255,255,255,0.65);
+  border-left: 5px solid #1C6DD0;
+  border-radius: 12px;
+  padding: 8px 10px;
+
+  box-shadow: 0 6px 16px rgba(0,0,0,0.08);
+  z-index: 50;
+}
+
+.user-badge #userInfo{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.logout-btn.logout-btn--mini {
+  padding: 6px 10px !important;
+  border-radius: 10px;
+  font-size: 0.9rem;
+}
+
+/* ---------------- SIDEBAR MINI ---------------- */
 .sidebar {
   background: #d7dde5;
   border-radius: 14px;
-  padding: 14px;
+  padding: 10px 8px;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
   border-left: 6px solid #1C6DD0;
   height: fit-content;
-
-  /* NO sticky: no “sigue” al hacer scroll */
   position: relative;
   top: auto;
 }
 
-.sidebar-title {
-  font-weight: 800;
-  font-size: 1.05rem;
-  margin-bottom: 10px;
-}
-
-.sidebar-hint {
-  margin-top: 12px;
-  font-size: 0.9rem;
-  opacity: 0.8;
-}
-
-/* Usuario compacto dentro del sidebar */
-.user-bar.user-bar-compact{
-  margin-bottom: 12px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  border-left: 5px solid #1C6DD0;
-  background: rgba(255,255,255,0.55);
-  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.06);
-  display:flex;
-  align-items:center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.user-bar.user-bar-compact .user-left{
-  display:flex;
-  align-items:center;
-  gap: 6px;
-  min-width: 0;
-}
-
-.user-bar.user-bar-compact .user-icon { font-size: 16px; }
-
-.user-bar.user-bar-compact .user-name{
-  font-weight: 900;
-  font-size: 0.95rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 130px;
-}
-
-.user-bar.user-bar-compact .user-role{
-  font-size: 0.85rem;
-  opacity: 0.85;
-  white-space: nowrap;
-}
-
-.user-bar.user-bar-compact .logout-btn{
-  padding: 7px 10px;
-  border-radius: 10px;
-  font-size: 0.9rem;
-}
-
-/* Botones menú */
+/* Botones menú (solo icono) */
 .nav-btn {
   width: 100%;
-  text-align: left;
-  margin: 6px 0;
-  padding: 10px 12px;
-  border-radius: 10px;
   border: none;
   cursor: pointer;
-  font-weight: 800;
+  font-weight: 900;
   background: rgba(28, 109, 208, 0.12);
   color: #0A2342;
   box-shadow: none;
   transition: 0.18s;
+}
+
+.nav-btn--icon{
+  width: 46px;
+  height: 46px;
+  margin: 8px auto;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  font-size: 20px;
 }
 
 .nav-btn:hover {
@@ -203,7 +188,54 @@ header p { margin: 4px 0 0; opacity: 0.95; }
   box-shadow: 0 4px 10px rgba(28, 109, 208, 0.35);
 }
 
-.content { min-width: 0; }
+/* ✅ Tooltip bonito (sin JS) */
+.nav-btn[data-tip]{
+  position: relative;
+}
+
+.nav-btn[data-tip]::after{
+  content: attr(data-tip);
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(10,35,66,0.95);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 800;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  box-shadow: 0 10px 24px rgba(0,0,0,0.25);
+  border: 1px solid rgba(255,255,255,0.12);
+}
+
+.nav-btn[data-tip]::before{
+  content: "";
+  position: absolute;
+  left: calc(100% + 4px);
+  top: 50%;
+  transform: translateY(-50%);
+  border: 6px solid transparent;
+  border-right-color: rgba(10,35,66,0.95);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.nav-btn[data-tip]:hover::after,
+.nav-btn[data-tip]:hover::before{
+  opacity: 1;
+}
+
+/* Para que en móvil no moleste */
+@media (max-width: 700px) {
+  .nav-btn[data-tip]::after,
+  .nav-btn[data-tip]::before { display: none; }
+}
+
+.content { min-width: 0; padding-top: 56px; } /* ✅ espacio para que no tape user-badge */
 
 /* ---------------- SELECTORES ---------------- */
 .client-selector,
@@ -294,10 +326,27 @@ button:not(.nav-btn):hover {
   margin-bottom: 14px;
 }
 
-/* ---------------- SENSOR GRID ---------------- */
+/* =========================================================
+   VISTA TIENDA: card a la izquierda + espacio vacío derecha
+   ========================================================= */
+.store-two-col{
+  display: grid;
+  grid-template-columns: 520px 1fr;
+  gap: 18px;
+  align-items: start;
+}
+
+.store-left { min-width: 0; }
+.store-right {
+  min-height: 360px;
+  border-radius: 14px;
+  background: transparent;
+}
+
+/* En el contenedor de sensores solo una columna */
 #sensorsContainer {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: 1fr;
   gap: 16px;
 }
 
@@ -412,9 +461,14 @@ footer {
 #countdownSeconds { font-weight: 900; }
 
 /* ---------------- RESPONSIVE ---------------- */
+@media (max-width: 1100px) {
+  .store-two-col { grid-template-columns: 1fr; }
+  .store-right { display: none; }
+}
+
 @media (max-width: 900px) {
-  .app-shell { grid-template-columns: 1fr; }
-  .sidebar { position: relative; top: auto; }
+  .app-shell { grid-template-columns: 64px 1fr; }
+  .content { padding-top: 64px; }
 }
 
 @media (max-width: 420px) {
