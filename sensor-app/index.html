@@ -36,33 +36,33 @@
   </section>
 
   <!-- CONTENIDO PRINCIPAL (se muestra SOLO tras login) -->
-  <main id="mainContent" class="app-shell" style="display: none;">
+  <main id="mainContent" class="app-shell app-shell--mini" style="display: none;">
 
-    <!-- MENÚ LATERAL -->
-    <aside class="sidebar">
+    <!-- ✅ Barra usuario a la derecha (compacta) -->
+    <section class="user-badge" aria-label="Usuario">
+      <div id="userInfo"></div>
+      <button id="logoutBtn" class="logout-btn logout-btn--mini" title="Salir">Salir</button>
+    </section>
 
-      <!-- Usuario compacto ARRIBA del menú -->
-      <section class="user-bar user-bar-compact">
-        <div class="user-left">
-          <span id="userInfo"></span>
-        </div>
-        <div class="user-right">
-          <button id="logoutBtn" class="logout-btn">Salir</button>
-        </div>
-      </section>
+    <!-- ✅ Menú angosto a la izquierda (solo iconos + tooltip) -->
+    <aside class="sidebar sidebar--mini" aria-label="Menú">
+      <button class="nav-btn nav-btn--icon active" data-view="view-store"
+              aria-label="Tienda" data-tip="Tienda">
+        🏬
+      </button>
 
-      <div class="sidebar-title">Menú</div>
+      <button class="nav-btn nav-btn--icon" data-view="view-charts"
+              aria-label="Gráficos" data-tip="Gráficos">
+        📈
+      </button>
 
-      <button class="nav-btn active" data-view="view-store">🏬 Tienda</button>
-      <button class="nav-btn" data-view="view-charts">📈 Gráficos</button>
-      <button class="nav-btn" data-view="view-calendar">📅 Calendario</button>
-
-      <div class="sidebar-hint">
-        Selecciona una opción para ver los datos.
-      </div>
+      <button class="nav-btn nav-btn--icon" data-view="view-calendar"
+              aria-label="Calendario" data-tip="Calendario">
+        📅
+      </button>
     </aside>
 
-    <!-- CONTENIDO DERECHA -->
+    <!-- CONTENIDO -->
     <section class="content">
 
       <!-- Selector de cliente (solo admin) -->
@@ -100,7 +100,14 @@
           </label>
         </section>
 
-        <section id="sensorsContainer"></section>
+        <!-- ✅ 2 columnas: izquierda info, derecha espacio vacío -->
+        <div class="store-two-col">
+          <div class="store-left">
+            <section id="sensorsContainer"></section>
+          </div>
+
+          <div class="store-right" aria-hidden="true"></div>
+        </div>
       </section>
 
       <!-- =========================
