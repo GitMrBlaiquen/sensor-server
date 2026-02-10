@@ -44,8 +44,8 @@ header p { margin: 4px 0 0; opacity: 0.95; }
   align-items: center;
   gap: 10px;
 
-  background: #15AB1F;            /* ✅ verde pedido */
-  border-left: 5px solid #0f7d17;
+  background: #000A4F;            /* ✅ verde pedido */
+  border-left: 5px solid #000108;
   border-radius: 12px;
   padding: 8px 10px;
   box-shadow: 0 6px 16px rgba(0,0,0,0.18);
@@ -363,3 +363,4 @@ footer {
   header h1 { font-size: 1.15rem; }
   .login-card { width: 92%; }
 }
+
