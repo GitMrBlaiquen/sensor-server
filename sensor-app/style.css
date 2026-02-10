@@ -110,19 +110,22 @@ header p { margin: 4px 0 0; opacity: 0.95; }
 
 /* =========================================================
    ✅ USER BADGE VERDE (#15AB1F)
+   - IMPORTANTE: oculto por defecto (login)
+   - se muestra SOLO cuando #mainContent está visible
    ========================================================= */
 .user-badge{
+  display: none; /* ✅ por defecto NO se ve en login */
+
   position: fixed;
   top: calc(var(--header-offset) + var(--gap-under-header));
   right: 0;
   margin-right: 12px;
 
-  display: flex;
   align-items: center;
   gap: 10px;
 
-  background: #03064F;
-  border-left: 5px solid #000108;
+  background: #15AB1F;
+  border-left: 5px solid #0f7d17;
   border-radius: 12px;
   padding: 8px 10px;
   box-shadow: 0 6px 16px rgba(0,0,0,0.15);
@@ -135,8 +138,13 @@ header p { margin: 4px 0 0; opacity: 0.95; }
   color: white;
 }
 
+/* ✅ Mostrar badge SOLO si mainContent NO está en display:none */
+#mainContent:not([style*="display: none"]) .user-badge{
+  display: flex;
+}
+
 /* =========================================================
-   SIDEBAR
+   SIDEBAR (también solo cuando mainContent está visible)
    ========================================================= */
 .sidebar{
   position: fixed;
@@ -220,7 +228,7 @@ label {
   flex-wrap: wrap;
 }
 
-/* ---------------- BOTONES ---------------- */
+/* ---------------- BOTONES (normales) ---------------- */
 button:not(.nav-btn) {
   padding: 10px 18px;
   border-radius: 8px;
@@ -244,10 +252,12 @@ button:not(.nav-btn):hover {
   padding: 8px 14px;
   border-radius: 8px;
   cursor: pointer;
+  transition: 0.2s;
 }
 
 .logout-btn:hover {
   background: #e74c3c !important;
+  transform: translateY(-2px);
 }
 
 /* ---------------- TOOLBAR ---------------- */
@@ -276,6 +286,7 @@ button:not(.nav-btn):hover {
   padding: 18px 20px;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
   border-left: 6px solid #1C6DD0;
+  transition: 0.2s;
 }
 
 /* ---------------- FOOTER ---------------- */
@@ -305,6 +316,8 @@ footer {
   box-shadow: 0 8px 26px rgba(0, 0, 0, 0.25);
   max-width: 420px;
   width: 90%;
+  text-align: center;
+  border-left: 6px solid #1C6DD0;
 }
 
 /* ---------------- RESPONSIVE ---------------- */
@@ -318,5 +331,3 @@ footer {
 @media (max-width: 900px){
   :root{ --header-offset: 130px; }
 }
-
-
