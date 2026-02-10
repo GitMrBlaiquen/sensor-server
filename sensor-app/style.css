@@ -24,7 +24,7 @@ header p { margin: 4px 0 0; opacity: 0.95; }
 .header-text { display: flex; flex-direction: column; }
 
 .logo {
-  height: 70px;
+  height: 140px;
   margin-right: 12px;
   object-fit: contain;
 }
@@ -114,12 +114,12 @@ header p { margin: 4px 0 0; opacity: 0.95; }
    ========================================================= */
 /* Ajusta este valor si cambias la altura del header */
 :root{
-  --header-offset: 160px; /* ✅ debajo del header azul */
+  --header-offset: 170px; /* ✅ debajo del header azul */
 }
 
 .user-badge {
   position: fixed;
-  top: var(--header-offset); /* ✅ aquí se baja debajo del header */
+  top: calc(var(--header-offset) + 35px; /* ✅ aquí se baja debajo del header */
   right: 0;                  /* ✅ pegado al borde derecho */
   z-index: 200;
 
@@ -158,7 +158,7 @@ header p { margin: 4px 0 0; opacity: 0.95; }
    ========================================================= */
 .sidebar--mini {
   position: fixed;
-  top: var(--header-offset); /* ✅ también debajo del header */
+  top: calc(var(--header-offset) + 35px); /* ✅ también debajo del header */
   left: 0;                   /* ✅ pegado al borde izquierdo */
   z-index: 150;
 
@@ -516,6 +516,7 @@ footer {
     padding-right: 12px;
   }
 }
+
 
 
 
