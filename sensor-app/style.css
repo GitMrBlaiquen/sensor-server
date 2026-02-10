@@ -108,33 +108,41 @@ header p { margin: 4px 0 0; opacity: 0.95; }
 }
 
 /* =========================================================
-   ✅ USER BADGE (verde) - FIX DEFINITIVO
-   - Se ve SIEMPRE después del login
-   - NO se ve en pantalla de login
+   ✅ USER BADGE (verde)
+   - IMPORTANTE: OCULTO POR DEFECTO
+   - SOLO APARECE cuando #mainContent ya NO está display:none
    ========================================================= */
+
+/* oculto por defecto */
 .user-badge{
+  display: none;
+}
+
+/* aparece SOLO después del login */
+#mainContent:not([style*="display: none"]) .user-badge{
   position: fixed;
   top: calc(var(--header-offset) + var(--gap-under-header));
-  right: 0;
-  margin-right: 12px;
+  right: 12px;
 
-  display: flex;                 /* ✅ visible por defecto */
+  display: flex;
   align-items: center;
   gap: 10px;
 
-  background: #15AB1F;
+  background: #15AB1F;          /* ✅ verde pedido */
   border-left: 5px solid #0f7d17;
   border-radius: 12px;
   padding: 8px 10px;
   box-shadow: 0 6px 16px rgba(0,0,0,0.15);
   z-index: 50;
 
-  color: white;
+  color: #fff;
 }
 
-.user-badge *{ color: white; }
+#mainContent:not([style*="display: none"]) .user-badge *{
+  color: #fff;
+}
 
-.user-badge #userInfo{
+#mainContent:not([style*="display: none"]) .user-badge #userInfo{
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -144,13 +152,8 @@ header p { margin: 4px 0 0; opacity: 0.95; }
   text-overflow: ellipsis;
 }
 
-/* ✅ Mientras el loginPanel esté visible, escondemos el badge */
-#loginPanel:not([style*="display: none"]) ~ #mainContent .user-badge{
-  display: none;
-}
-
 /* =========================================================
-   SIDEBAR
+   SIDEBAR (debajo del header, pegado izquierda)
    ========================================================= */
 .sidebar{
   position: fixed;
@@ -166,6 +169,7 @@ header p { margin: 4px 0 0; opacity: 0.95; }
   z-index: 40;
 }
 
+/* Botones menú */
 .nav-btn{
   width: 100%;
   border: none;
@@ -195,6 +199,48 @@ header p { margin: 4px 0 0; opacity: 0.95; }
   background: #1C6DD0;
   color: white;
   box-shadow: 0 4px 10px rgba(28, 109, 208, 0.35);
+}
+
+/* Tooltip */
+.nav-btn[data-tip]{ position: relative; }
+
+.nav-btn[data-tip]::after{
+  content: attr(data-tip);
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(10,35,66,0.95);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 800;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  box-shadow: 0 10px 24px rgba(0,0,0,0.25);
+  border: 1px solid rgba(255,255,255,0.12);
+}
+
+.nav-btn[data-tip]::before{
+  content: "";
+  position: absolute;
+  left: calc(100% + 4px);
+  top: 50%;
+  transform: translateY(-50%);
+  border: 6px solid transparent;
+  border-right-color: rgba(10,35,66,0.95);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.nav-btn[data-tip]:hover::after,
+.nav-btn[data-tip]:hover::before{ opacity: 1; }
+
+@media (max-width: 700px){
+  .nav-btn[data-tip]::after,
+  .nav-btn[data-tip]::before{ display:none; }
 }
 
 /* ---------------- CONTENT ---------------- */
