@@ -1,12 +1,11 @@
 // ==============================
 // app.js (reescrito / limpio)
-// - Mantiene login + admin/dueño + vistas + gráfico + resumen
-// - Mantiene polling de estado (heartbeat)
-// - Muestra CLIENTES (ya restado de niños + trabajadores desde el server)
-// - Muestra TRABAJADORES y NIÑOS como datos aparte
+// ✅ NUEVO:
+// - Agrega/quita body.logged-in para que user-badge + sidebar NO aparezcan en login
+// - Login/Logout actualizan el UI correctamente
+// - Mantiene todo lo que ya tenías: admin/dueño, vistas, polling, gráfico, resumen
 // ==============================
 
-// URL base de la API
 const BASE_URL = window.location.origin;
 // const BASE_URL = "http://localhost:10000";
 
@@ -30,7 +29,7 @@ const passwordInput = document.getElementById("passwordInput");
 const loginBtn = document.getElementById("loginBtn");
 const loginStatus = document.getElementById("loginStatus");
 
-// Usuario + logout
+// Usuario + logout (ahora en el header)
 const userInfo = document.getElementById("userInfo");
 const logoutBtn = document.getElementById("logoutBtn");
 
@@ -78,6 +77,17 @@ let currentStoreId = null;
 // Solo admin
 let clients = [];
 let currentClientId = null;
+
+// ------------------------------
+// ✅ Helpers: UI Logged-In
+// ------------------------------
+function setLoggedInUI(isLoggedIn) {
+  // Esto controla user-badge + sidebar desde el CSS
+  document.body.classList.toggle("logged-in", !!isLoggedIn);
+}
+
+// Asegura que al cargar la página, NO se muestre nada de usuario/menú
+setLoggedInUI(false);
 
 // ------------------------------
 // Utilidades: clientes/tiendas
@@ -320,6 +330,9 @@ async function login() {
       return;
     }
 
+    // ✅ Marca como logueado para mostrar user-badge + sidebar
+    setLoggedInUI(true);
+
     if (userInfo) {
       const roleLabel = currentRole === "admin" ? "Administrador" : "Dueño";
       userInfo.innerHTML = `
@@ -367,6 +380,10 @@ async function login() {
     }
   } catch (err) {
     console.error(err);
+
+    // ✅ Si falla el login, asegúrate de NO mostrar user-badge + sidebar
+    setLoggedInUI(false);
+
     loginStatus.textContent = err.message || "No se pudo iniciar sesión.";
     loginStatus.style.color = "red";
   }
@@ -395,6 +412,9 @@ function logout() {
   currentStoreId = null;
   clients = [];
   currentClientId = null;
+
+  // ✅ Oculta user-badge + sidebar SIEMPRE en logout
+  setLoggedInUI(false);
 
   if (userInfo) userInfo.textContent = "";
   if (storeSelect) storeSelect.innerHTML = "";
@@ -474,17 +494,12 @@ async function loadSensors() {
 function renderStoreCounters(counters, status) {
   const {
     storeId,
-    // ✅ Estos YA vienen como CLIENTES (restado en el server: total - niños - trabajadores)
     entradas = 0,
     salidas = 0,
     dentro = 0,
-
-    // ✅ datos aparte
     inChild = 0,
     outChild = 0,
     workersIn = 0,
-
-    // opcional debug si tu server los manda
     totalEntradas = null,
     totalSalidas = null,
   } = counters || {};
@@ -494,7 +509,6 @@ function renderStoreCounters(counters, status) {
 
   sensorsContainer.innerHTML = "";
 
-  // Leyenda de estado sensor
   const legend = document.createElement("div");
   legend.className = "sensor-legend";
   legend.innerHTML = `
@@ -668,10 +682,7 @@ function drawSimpleChart(byHour, dateStr) {
 
   const maxY = Math.max(1, ...pointsE, ...pointsS);
 
-  const padL = 50,
-    padR = 15,
-    padT = 20,
-    padB = 45;
+  const padL = 50, padR = 15, padT = 20, padB = 45;
   const plotW = W - padL - padR;
   const plotH = H - padT - padB;
 
