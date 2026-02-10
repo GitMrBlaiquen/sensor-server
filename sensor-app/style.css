@@ -1,8 +1,13 @@
 * { box-sizing: border-box; }
 
+/* =========================================================
+   VARIABLES
+   - --header-offset: alto del header azul (ajústalo)
+   - --gap-under-header: espacio extra para bajar menú/usuario
+   ========================================================= */
 :root{
-  /* Ajusta esto para “bajar” sidebar + user badge debajo del header */
-  --header-offset: 120px;
+  --header-offset: 120px;     /* ✅ AJUSTA ESTE NÚMERO si el header es más alto */
+  --gap-under-header: 10px;   /* ✅ espacio extra debajo del header */
   --sidebar-width: 64px;
 }
 
@@ -96,21 +101,28 @@ header p { margin: 4px 0 0; opacity: 0.95; }
 }
 
 /* =========================================================
-   APP LAYOUT (contenido con padding para sidebar fixed)
+   APP LAYOUT
    ========================================================= */
 .app-shell{
   position: relative;
   padding: 16px 18px 40px;
-  /* deja espacio para el sidebar fixed en el borde izquierdo */
+
+  /* ✅ deja espacio para sidebar fixed */
   padding-left: calc(var(--sidebar-width) + 24px);
+
+  /* ✅ opcional: baja un poco el contenido también */
+  padding-top: 0;
 }
 
-/* ---------------- USER BADGE (pegado al borde derecho) ---------------- */
+/* =========================================================
+   USER BADGE (debajo del header, pegado derecha)
+   ========================================================= */
 .user-badge{
   position: fixed;
-  top: var(--header-offset);
-  right: 0;              /* ✅ pegado al borde derecho */
-  margin-right: 12px;    /* un poquito de aire */
+  top: calc(var(--header-offset) + var(--gap-under-header)); /* ✅ bajo el header */
+  right: 0;
+  margin-right: 12px;
+
   display: flex;
   align-items: center;
   gap: 10px;
@@ -133,15 +145,17 @@ header p { margin: 4px 0 0; opacity: 0.95; }
   text-overflow: ellipsis;
 }
 
-/* ---------------- SIDEBAR (pegado borde izquierdo) ---------------- */
+/* =========================================================
+   SIDEBAR (debajo del header, pegado izquierda)
+   ========================================================= */
 .sidebar{
   position: fixed;
-  left: 0;               /* ✅ pegado al borde izquierdo */
-  top: var(--header-offset);
+  left: 0;
+  top: calc(var(--header-offset) + var(--gap-under-header)); /* ✅ bajo el header */
   width: var(--sidebar-width);
 
   background: #d7dde5;
-  border-radius: 0 14px 14px 0; /* solo redondeo a la derecha */
+  border-radius: 0 14px 14px 0;
   padding: 10px 8px;
   box-shadow: 0 6px 20px rgba(0,0,0,0.08);
   border-left: 6px solid #1C6DD0;
@@ -389,7 +403,7 @@ footer {
   .login-card { width: 92%; }
 }
 
-/* Ajustes si achicas pantalla */
+/* ✅ En pantallas chicas, normalmente el header se hace más alto */
 @media (max-width: 900px){
-  :root{ --header-offset: 120px; }
+  :root{ --header-offset: 130px; }
 }
