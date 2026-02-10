@@ -15,10 +15,10 @@
       <p>Contador en tiempo real de entradas y salidas por tienda.</p>
     </div>
 
-    <!-- ✅ USER BADGE DENTRO DEL HEADER (arriba derecha) -->
-    <section class="user-badge">
+    <!-- ✅ USER BADGE dentro del header (arriba derecha) -->
+    <section class="user-badge" aria-label="Usuario">
       <span id="userInfo"></span>
-      <button id="logoutBtn" class="logout-btn logout-btn--mini">Salir</button>
+      <button id="logoutBtn" class="logout-btn">Salir</button>
     </section>
   </header>
 
@@ -47,17 +47,9 @@
 
     <!-- ✅ MENÚ LATERAL MINI (solo íconos) -->
     <aside class="sidebar">
-      <button class="nav-btn nav-btn--icon active" data-view="view-store" data-tip="Tienda" aria-label="Tienda">
-        🏬
-      </button>
-
-      <button class="nav-btn nav-btn--icon" data-view="view-charts" data-tip="Gráficos" aria-label="Gráficos">
-        📈
-      </button>
-
-      <button class="nav-btn nav-btn--icon" data-view="view-calendar" data-tip="Calendario" aria-label="Calendario">
-        📅
-      </button>
+      <button class="nav-btn nav-btn--icon active" data-view="view-store" data-tip="Tienda" aria-label="Tienda">🏬</button>
+      <button class="nav-btn nav-btn--icon" data-view="view-charts" data-tip="Gráficos" aria-label="Gráficos">📈</button>
+      <button class="nav-btn nav-btn--icon" data-view="view-calendar" data-tip="Calendario" aria-label="Calendario">📅</button>
     </aside>
 
     <!-- CONTENIDO -->
@@ -81,9 +73,7 @@
         </label>
       </section>
 
-      <!-- =========================
-           VISTA 1: TIENDA
-           ========================= -->
+      <!-- VISTA 1: TIENDA -->
       <section id="view-store" class="view active-view">
         <section class="toolbar">
           <button id="refreshBtn">Actualizar ahora</button>
@@ -101,9 +91,7 @@
         <section id="sensorsContainer"></section>
       </section>
 
-      <!-- =========================
-           VISTA 2: GRÁFICOS
-           ========================= -->
+      <!-- VISTA 2: GRÁFICOS -->
       <section id="view-charts" class="view">
         <h2>Gráfico por día</h2>
         <p class="view-desc">
@@ -123,9 +111,7 @@
         </div>
       </section>
 
-      <!-- =========================
-           VISTA 3: CALENDARIO / RESUMEN
-           ========================= -->
+      <!-- VISTA 3: CALENDARIO -->
       <section id="view-calendar" class="view">
         <h2>Resumen por día</h2>
         <p class="view-desc">
