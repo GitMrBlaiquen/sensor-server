@@ -9,10 +9,17 @@
 <body>
   <header>
     <img src="logo.png" alt="logo" class="logo">
+
     <div class="header-text">
       <h1>Panel de personas en tiendas comerciales</h1>
       <p>Contador en tiempo real de entradas y salidas por tienda.</p>
     </div>
+
+    <!-- ✅ USER BADGE DENTRO DEL HEADER (arriba derecha) -->
+    <section class="user-badge">
+      <span id="userInfo"></span>
+      <button id="logoutBtn" class="logout-btn logout-btn--mini">Salir</button>
+    </section>
   </header>
 
   <!-- PANEL DE LOGIN (pantalla inicial) -->
@@ -37,12 +44,6 @@
 
   <!-- CONTENIDO PRINCIPAL (se muestra SOLO tras login) -->
   <main id="mainContent" class="app-shell" style="display: none;">
-
-    <!-- ✅ USER BADGE (arriba derecha) -->
-    <section class="user-badge">
-      <span id="userInfo"></span>
-      <button id="logoutBtn" class="logout-btn">Salir</button>
-    </section>
 
     <!-- ✅ MENÚ LATERAL MINI (solo íconos) -->
     <aside class="sidebar">
