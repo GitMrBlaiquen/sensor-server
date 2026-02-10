@@ -2,12 +2,8 @@
 
 /* =========================================================
    VARIABLES
-   - --header-offset: alto del header azul (ajústalo)
-   - --gap-under-header: espacio extra para bajar menú/usuario
    ========================================================= */
 :root{
-  --header-offset: 160px;     /* ✅ AJUSTA ESTE NÚMERO si el header es más alto */
-  --gap-under-header: 30px;   /* ✅ espacio extra debajo del header */
   --sidebar-width: 64px;
 }
 
@@ -29,14 +25,50 @@ header {
   border-bottom: 3px solid #4DA9FF;
 }
 
+/* ✅ Esto empuja el user badge a la derecha */
+.header-text { 
+  display: flex; 
+  flex-direction: column; 
+  flex: 1;
+}
+
 header h1 { margin: 0; font-size: 1.4rem; }
 header p { margin: 4px 0 0; opacity: 0.95; }
-.header-text { display: flex; flex-direction: column; }
 
 .logo {
   height: 70px;
   margin-right: 12px;
   object-fit: contain;
+}
+
+/* ✅ USER BADGE DENTRO DEL HEADER */
+.user-badge{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  background: rgba(255,255,255,0.15);
+  border-radius: 12px;
+  padding: 8px 10px;
+
+  border: 1px solid rgba(255,255,255,0.18);
+  backdrop-filter: blur(6px);
+}
+
+.user-badge #userInfo{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.logout-btn--mini{
+  padding: 6px 10px !important;
+  border-radius: 10px;
+  font-size: 0.9rem;
 }
 
 /* ---------------- LOGIN PANEL ---------------- */
@@ -106,52 +138,16 @@ header p { margin: 4px 0 0; opacity: 0.95; }
 .app-shell{
   position: relative;
   padding: 16px 18px 40px;
-
-  /* ✅ deja espacio para sidebar fixed */
   padding-left: calc(var(--sidebar-width) + 24px);
-
-  /* ✅ opcional: baja un poco el contenido también */
-  padding-top: 0;
 }
 
 /* =========================================================
-   USER BADGE (debajo del header, pegado derecha)
-   ========================================================= */
-.user-badge{
-  position: fixed;
-  top: calc(var(--header-offset) + var(--gap-under-header)); /* ✅ bajo el header */
-  right: 0;
-  margin-right: 12px;
-
-  display: flex;
-  align-items: center;
-  gap: 10px;
-
-  background: rgba(255,255,255,0.65);
-  border-left: 5px solid #1C6DD0;
-  border-radius: 12px;
-  padding: 8px 10px;
-  box-shadow: 0 6px 16px rgba(0,0,0,0.08);
-  z-index: 50;
-}
-
-.user-badge #userInfo{
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  white-space: nowrap;
-  max-width: 240px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* =========================================================
-   SIDEBAR (debajo del header, pegado izquierda)
+   SIDEBAR (pegado borde izquierdo)
    ========================================================= */
 .sidebar{
   position: fixed;
   left: 0;
-  top: calc(var(--header-offset) + var(--gap-under-header)); /* ✅ bajo el header */
+  top: 120px; /* ✅ si quieres bajarlo más, sube este número */
   width: var(--sidebar-width);
 
   background: #d7dde5;
@@ -402,9 +398,3 @@ footer {
   header h1 { font-size: 1.15rem; }
   .login-card { width: 92%; }
 }
-
-/* ✅ En pantallas chicas, normalmente el header se hace más alto */
-@media (max-width: 900px){
-  :root{ --header-offset: 130px; }
-}
-
