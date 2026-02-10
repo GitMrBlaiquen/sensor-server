@@ -110,12 +110,17 @@ header p { margin: 4px 0 0; opacity: 0.95; }
 }
 
 /* =========================================================
-   ✅ USER BADGE PEGADO AL BORDE DERECHO (FIXED)
+   ✅ USER BADGE: BAJAR DEBAJO DE LA BARRA AZUL
    ========================================================= */
+/* Ajusta este valor si cambias la altura del header */
+:root{
+  --header-offset: 110px; /* ✅ debajo del header azul */
+}
+
 .user-badge {
   position: fixed;
-  top: 12px;      /* ✅ ajusta si quieres más arriba/abajo */
-  right: 0;       /* ✅ pegado al borde derecho */
+  top: var(--header-offset); /* ✅ aquí se baja debajo del header */
+  right: 0;                  /* ✅ pegado al borde derecho */
   z-index: 200;
 
   display: flex;
@@ -153,8 +158,8 @@ header p { margin: 4px 0 0; opacity: 0.95; }
    ========================================================= */
 .sidebar--mini {
   position: fixed;
-  top: 120px;  /* ✅ debajo del header (ajusta si tu header cambia) */
-  left: 0;     /* ✅ pegado al borde izquierdo */
+  top: var(--header-offset); /* ✅ también debajo del header */
+  left: 0;                   /* ✅ pegado al borde izquierdo */
   z-index: 150;
 
   width: 64px;
@@ -253,10 +258,7 @@ header p { margin: 4px 0 0; opacity: 0.95; }
 }
 
 /* ---------------- CONTENIDO ---------------- */
-.content {
-  min-width: 0;
-  padding-top: 0;
-}
+.content { min-width: 0; padding-top: 0; }
 
 /* ---------------- SELECTORES ---------------- */
 .client-selector,
@@ -487,25 +489,25 @@ footer {
 }
 
 @media (max-width: 900px) {
+  :root{ --header-offset: 104px; }
   .app-shell { padding-left: 88px; }
-  .sidebar--mini { top: 110px; }
 }
 
 @media (max-width: 420px) {
+  :root{ --header-offset: 96px; }
+
   header { padding: 16px; }
   .logo { height: 54px; }
   header h1 { font-size: 1.15rem; }
   .login-card { width: 92%; }
 
   .user-badge{
-    top: 8px;
     right: 0;
     transform: scale(0.95);
     transform-origin: top right;
   }
 
   .sidebar--mini{
-    top: 92px;
     width: 60px;
   }
 
