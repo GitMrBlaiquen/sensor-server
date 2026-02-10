@@ -6,8 +6,8 @@
    - --gap-under-header: espacio extra para bajar menú/usuario
    ========================================================= */
 :root{
-  --header-offset: 120px;     /* ✅ AJUSTA ESTE NÚMERO si el header es más alto */
-  --gap-under-header: 10px;   /* ✅ espacio extra debajo del header */
+  --header-offset: 160px;     /* ✅ AJUSTA ESTE NÚMERO si el header es más alto */
+  --gap-under-header: 30px;   /* ✅ espacio extra debajo del header */
   --sidebar-width: 64px;
 }
 
@@ -407,3 +407,4 @@ footer {
 @media (max-width: 900px){
   :root{ --header-offset: 130px; }
 }
+
