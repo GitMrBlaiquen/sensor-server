@@ -14,7 +14,7 @@ body {
 /* ---------------- HEADER ---------------- */
 header {
   position: relative; /* ✅ para posicionar el user-badge dentro */
-  background: linear-gradient(90deg, #0A2342, #1C6DD0);
+  background: linear-gradient(90deg, #124078, #1C6DD0);
   color: white;
   padding: 20px 28px;
   display: flex;
@@ -363,5 +363,6 @@ footer {
   header h1 { font-size: 1.15rem; }
   .login-card { width: 92%; }
 }
+
 
 
