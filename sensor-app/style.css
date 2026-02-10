@@ -114,7 +114,7 @@ header p { margin: 4px 0 0; opacity: 0.95; }
    ========================================================= */
 /* Ajusta este valor si cambias la altura del header */
 :root{
-  --header-offset: 180px; /* ✅ debajo del header azul */
+  --header-offset: 160px; /* ✅ debajo del header azul */
 }
 
 .user-badge {
@@ -516,6 +516,7 @@ footer {
     padding-right: 12px;
   }
 }
+
 
 
 
