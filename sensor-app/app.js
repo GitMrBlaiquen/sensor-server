@@ -1,11 +1,8 @@
 // ==============================
 // app.js (reescrito / limpio)
-// ✅ NUEVO:
-// - Agrega/quita body.logged-in para que user-badge + sidebar NO aparezcan en login
-// - Login/Logout actualizan el UI correctamente
-// - Mantiene todo lo que ya tenías: admin/dueño, vistas, polling, gráfico, resumen
 // ==============================
 
+// URL base de la API
 const BASE_URL = window.location.origin;
 // const BASE_URL = "http://localhost:10000";
 
@@ -29,7 +26,7 @@ const passwordInput = document.getElementById("passwordInput");
 const loginBtn = document.getElementById("loginBtn");
 const loginStatus = document.getElementById("loginStatus");
 
-// Usuario + logout (ahora en el header)
+// Usuario + logout
 const userInfo = document.getElementById("userInfo");
 const logoutBtn = document.getElementById("logoutBtn");
 
@@ -77,17 +74,6 @@ let currentStoreId = null;
 // Solo admin
 let clients = [];
 let currentClientId = null;
-
-// ------------------------------
-// ✅ Helpers: UI Logged-In
-// ------------------------------
-function setLoggedInUI(isLoggedIn) {
-  // Esto controla user-badge + sidebar desde el CSS
-  document.body.classList.toggle("logged-in", !!isLoggedIn);
-}
-
-// Asegura que al cargar la página, NO se muestre nada de usuario/menú
-setLoggedInUI(false);
 
 // ------------------------------
 // Utilidades: clientes/tiendas
@@ -285,9 +271,7 @@ async function refreshStatusOnly() {
     statusPill.classList.remove("status-on", "status-off");
     statusPill.classList.add(online ? "status-on" : "status-off");
     statusPill.textContent = online ? "🟢 Encendido" : "🔴 Apagado";
-  } catch {
-    // no rompemos UI
-  }
+  } catch {}
 }
 
 // ------------------------------
@@ -329,9 +313,6 @@ async function login() {
       loginStatus.style.color = "red";
       return;
     }
-
-    // ✅ Marca como logueado para mostrar user-badge + sidebar
-    setLoggedInUI(true);
 
     if (userInfo) {
       const roleLabel = currentRole === "admin" ? "Administrador" : "Dueño";
@@ -380,10 +361,6 @@ async function login() {
     }
   } catch (err) {
     console.error(err);
-
-    // ✅ Si falla el login, asegúrate de NO mostrar user-badge + sidebar
-    setLoggedInUI(false);
-
     loginStatus.textContent = err.message || "No se pudo iniciar sesión.";
     loginStatus.style.color = "red";
   }
@@ -412,9 +389,6 @@ function logout() {
   currentStoreId = null;
   clients = [];
   currentClientId = null;
-
-  // ✅ Oculta user-badge + sidebar SIEMPRE en logout
-  setLoggedInUI(false);
 
   if (userInfo) userInfo.textContent = "";
   if (storeSelect) storeSelect.innerHTML = "";
@@ -491,6 +465,13 @@ async function loadSensors() {
   }
 }
 
+/**
+ * ✅ NUEVO RENDER:
+ * - Izquierda: tarjeta compacta con Tienda + SN + Estado
+ * - Derecha: 6 cuadros (stats) en el orden que pediste
+ * - NO muestra debug ni "Última actualización"
+ * - NO muestra el bloque grande de texto debajo de “Apagado”
+ */
 function renderStoreCounters(counters, status) {
   const {
     storeId,
@@ -500,34 +481,22 @@ function renderStoreCounters(counters, status) {
     inChild = 0,
     outChild = 0,
     workersIn = 0,
-    totalEntradas = null,
-    totalSalidas = null,
   } = counters || {};
 
   const online = !!status?.online;
   const sn = status?.sn || "SN desconocido";
+  const storeName = getStoreName(storeId);
 
   sensorsContainer.innerHTML = "";
 
-  const legend = document.createElement("div");
-  legend.className = "sensor-legend";
-  legend.innerHTML = `
-    <span class="legend-item"><span class="status-pill status-on">🟢</span> Encendido</span>
-    <span class="legend-item"><span class="status-pill status-off">🔴</span> Apagado</span>
-  `;
-  sensorsContainer.appendChild(legend);
+  // Contenedor layout (izq + derecha)
+  const wrap = document.createElement("section");
+  wrap.className = "store-dashboard";
 
-  const card = document.createElement("article");
-  card.className = "sensor-card";
-
-  const nowStr = new Date().toLocaleTimeString();
-  const storeName = getStoreName(storeId);
-
-  const showDebug = totalEntradas !== null || totalSalidas !== null;
-  const debugEntradas = totalEntradas ?? 0;
-  const debugSalidas = totalSalidas ?? 0;
-
-  card.innerHTML = `
+  // Izquierda (tarjeta compacta)
+  const left = document.createElement("article");
+  left.className = "sensor-card sensor-card--compact";
+  left.innerHTML = `
     <div class="sensor-header">
       <div>
         <div class="sensor-id">${storeName}</div>
@@ -541,65 +510,49 @@ function renderStoreCounters(counters, status) {
         </div>
       </div>
     </div>
+  `;
 
-    <div class="store-counters">
-
-      <div class="store-counter-item">
-        <span class="label">Clientes que han ENTRADO (sin niños ni trabajadores)</span>
-        <span class="value">${entradas}</span>
-      </div>
-
-      <div class="store-counter-item">
-        <span class="label">Clientes que han SALIDO (sin niños)</span>
-        <span class="value">${salidas}</span>
-      </div>
-
-      <div class="store-counter-item">
-        <span class="label">Clientes DENTRO (estimado)</span>
-        <span class="value">${dentro}</span>
-      </div>
-
-      <hr style="border:none;border-top:1px solid rgba(0,0,0,0.12);margin:10px 0;" />
-
-      <div class="store-counter-item">
-        <span class="label">Trabajadores detectados (workcard)</span>
-        <span class="value">${workersIn}</span>
-      </div>
-
-      <div class="store-counter-item">
-        <span class="label">Niños que han ENTRADO</span>
-        <span class="value">${inChild}</span>
-      </div>
-
-      <div class="store-counter-item">
-        <span class="label">Niños que han SALIDO</span>
-        <span class="value">${outChild}</span>
-      </div>
-
-      ${
-        showDebug
-          ? `
-        <hr style="border:none;border-top:1px solid rgba(0,0,0,0.10);margin:10px 0;" />
-        <div class="store-counter-item" style="opacity:0.75;">
-          <span class="label">Total ENTRADAS del sensor (debug)</span>
-          <span class="value">${debugEntradas}</span>
-        </div>
-        <div class="store-counter-item" style="opacity:0.75;">
-          <span class="label">Total SALIDAS del sensor (debug)</span>
-          <span class="value">${debugSalidas}</span>
-        </div>
-      `
-          : ""
-      }
-
+  // Derecha (6 cuadros)
+  const right = document.createElement("div");
+  right.className = "stats-grid";
+  right.innerHTML = `
+    <div class="stat-box">
+      <div class="stat-title">Clientes que entraron</div>
+      <div class="stat-value">${entradas}</div>
     </div>
 
-    <div class="sensor-meta">
-      Última actualización: ${nowStr}
+    <div class="stat-box">
+      <div class="stat-title">Clientes que salieron</div>
+      <div class="stat-value">${salidas}</div>
+    </div>
+
+    <div class="stat-box">
+      <div class="stat-title">Clientes dentro</div>
+      <div class="stat-value">${dentro}</div>
+    </div>
+
+    <div class="stat-box">
+      <div class="stat-title">Niños que entraron</div>
+      <div class="stat-value">${inChild}</div>
+    </div>
+
+    <div class="stat-box">
+      <div class="stat-title">Niños que salieron</div>
+      <div class="stat-value">${outChild}</div>
+    </div>
+
+    <div class="stat-box">
+      <div class="stat-title">Trabajadores</div>
+      <div class="stat-value">${workersIn}</div>
     </div>
   `;
 
-  sensorsContainer.appendChild(card);
+  wrap.appendChild(left);
+  wrap.appendChild(right);
+  sensorsContainer.appendChild(wrap);
+
+  // refresca estado por si cambió (mantiene el polling)
+  // (no rompe si el polling llega antes/después)
 }
 
 // ------------------------------
@@ -682,7 +635,10 @@ function drawSimpleChart(byHour, dateStr) {
 
   const maxY = Math.max(1, ...pointsE, ...pointsS);
 
-  const padL = 50, padR = 15, padT = 20, padB = 45;
+  const padL = 50,
+    padR = 15,
+    padT = 20,
+    padB = 45;
   const plotW = W - padL - padR;
   const plotH = H - padT - padB;
 
