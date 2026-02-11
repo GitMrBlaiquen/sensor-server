@@ -1,12 +1,10 @@
 // ==============================
-// app.js (FULL / reescrito)
-// - Login + admin/dueño + selector cliente/tienda
-// - Vistas (Tienda / Gráficos / Calendario)
-// - Polling de estado (online/offline) por store
-// - Muestra CLIENTES (server ya resta niños + trabajadores)
+// app.js (reescrito / limpio)
+// - Login + admin/dueño + vistas + donut chart + resumen
+// - Polling estado (heartbeat)
+// - Muestra CLIENTES (ya restado de niños + trabajadores desde el server)
 // - Muestra TRABAJADORES y NIÑOS como datos aparte
-// - Gráfico profesional tipo DONUT (pie) con leyenda + %
-// - Evita que el user-badge aparezca en el login (se oculta hasta login)
+// - Oculta user-badge y sidebar en login (para que NO se vean antes de loguear)
 // ==============================
 
 // URL base de la API
@@ -33,10 +31,13 @@ const passwordInput = document.getElementById("passwordInput");
 const loginBtn = document.getElementById("loginBtn");
 const loginStatus = document.getElementById("loginStatus");
 
-// User badge (dentro del mainContent)
-const userBadge = document.querySelector(".user-badge");
+// Usuario + logout
 const userInfo = document.getElementById("userInfo");
 const logoutBtn = document.getElementById("logoutBtn");
+
+// ✅ UI flotante (para ocultar en login)
+const userBadgeEl = document.querySelector(".user-badge");
+const sidebarEl = document.querySelector(".sidebar");
 
 // Selector de cliente (solo admin)
 const clientSelectorSection = document.getElementById("clientSelectorSection");
@@ -45,13 +46,13 @@ const clientSelect = document.getElementById("clientSelect");
 // Selector de tienda
 const storeSelect = document.getElementById("storeSelect");
 
-// Modal inactividad
+// Modal de inactividad
 const sessionWarningModal = document.getElementById("sessionWarningModal");
 const stayLoggedBtn = document.getElementById("stayLoggedBtn");
 const logoutNowBtn = document.getElementById("logoutNowBtn");
 const countdownSpan = document.getElementById("countdownSeconds");
 
-// Menú / vistas
+// Menú y vistas
 const navButtons = document.querySelectorAll(".nav-btn");
 const views = document.querySelectorAll(".view");
 
@@ -84,15 +85,17 @@ let clients = [];
 let currentClientId = null;
 
 // ------------------------------
-// Helpers UI (mostrar/ocultar badge)
+// Helpers UI: mostrar/ocultar cosas flotantes
 // ------------------------------
-function setUserBadgeVisible(isVisible) {
-  if (!userBadge) return;
-  userBadge.style.display = isVisible ? "flex" : "none";
+function setLoggedInUI(isLoggedIn) {
+  // mainContent lo maneja login/logout
+  // pero forzamos ocultar/mostrar por si CSS fixed se ve igual
+  if (userBadgeEl) userBadgeEl.style.display = isLoggedIn ? "flex" : "none";
+  if (sidebarEl) sidebarEl.style.display = isLoggedIn ? "block" : "none";
 }
 
-// Asegura estado inicial (por si el CSS lo muestra)
-setUserBadgeVisible(false);
+// Al cargar la página: ocultar badge/menu (hasta login)
+setLoggedInUI(false);
 
 // ------------------------------
 // Utilidades: clientes/tiendas
@@ -177,7 +180,7 @@ function getStoreName(storeId) {
 }
 
 // ------------------------------
-// Menú: cambiar vista
+// Menú lateral: cambiar vista
 // ------------------------------
 function showView(viewId) {
   views.forEach((v) => v.classList.remove("active-view"));
@@ -199,8 +202,8 @@ navButtons.forEach((btn) => {
 // ------------------------------
 // Inactividad
 // ------------------------------
-const INACTIVITY_LIMIT_MS = 1 * 60 * 1000; // 1 min
-const WARNING_DURATION_MS = 30 * 1000; // 30 s
+const INACTIVITY_LIMIT_MS = 1 * 60 * 1000; // 1 minuto
+const WARNING_DURATION_MS = 30 * 1000; // 30 segundos
 
 let inactivityTimer = null;
 let logoutTimer = null;
@@ -255,7 +258,7 @@ if (stayLoggedBtn) stayLoggedBtn.addEventListener("click", () => resetInactivity
 if (logoutNowBtn) logoutNowBtn.addEventListener("click", () => logout());
 
 // ------------------------------
-// Polling estado
+// Polling estado (heartbeat)
 // ------------------------------
 function startStatusPolling() {
   stopStatusPolling();
@@ -303,18 +306,14 @@ async function login() {
   const password = (passwordInput?.value || "").trim();
 
   if (!username || !password) {
-    if (loginStatus) {
-      loginStatus.textContent = "Ingresa usuario y contraseña.";
-      loginStatus.style.color = "red";
-    }
+    loginStatus.textContent = "Ingresa usuario y contraseña.";
+    loginStatus.style.color = "red";
     return;
   }
 
   try {
-    if (loginStatus) {
-      loginStatus.textContent = "Ingresando...";
-      loginStatus.style.color = "inherit";
-    }
+    loginStatus.textContent = "Ingresando...";
+    loginStatus.style.color = "inherit";
 
     const res = await fetch(LOGIN_URL, {
       method: "POST",
@@ -334,14 +333,11 @@ async function login() {
     currentStores = data.stores || [];
 
     if (currentStores.length === 0) {
-      if (loginStatus) {
-        loginStatus.textContent = "El usuario no tiene tiendas asignadas.";
-        loginStatus.style.color = "red";
-      }
+      loginStatus.textContent = "El usuario no tiene tiendas asignadas.";
+      loginStatus.style.color = "red";
       return;
     }
 
-    // Pintar usuario
     if (userInfo) {
       const roleLabel = currentRole === "admin" ? "Administrador" : "Dueño";
       userInfo.innerHTML = `
@@ -351,7 +347,6 @@ async function login() {
       `;
     }
 
-    // Admin: arma clientes
     if (currentRole === "admin") {
       clients = buildClientsFromStores(currentStores);
       if (clients.length > 0) {
@@ -369,11 +364,13 @@ async function login() {
       fillStoreSelectSimple();
     }
 
-    // Mostrar app
-    if (loginStatus) loginStatus.textContent = "";
+    // Mostrar UI principal
+    loginStatus.textContent = "";
     if (loginPanel) loginPanel.style.display = "none";
     if (mainContent) mainContent.style.display = "block";
-    setUserBadgeVisible(true);
+
+    // ✅ Mostrar user-badge + sidebar solo después de login
+    setLoggedInUI(true);
 
     showView("view-store");
 
@@ -387,15 +384,13 @@ async function login() {
     if (currentStoreId) {
       await loadSensors();
       refreshStatusOnly();
-    } else if (sensorsContainer) {
+    } else {
       sensorsContainer.innerHTML = "<p>No hay tiendas disponibles para este usuario.</p>";
     }
   } catch (err) {
     console.error(err);
-    if (loginStatus) {
-      loginStatus.textContent = err.message || "No se pudo iniciar sesión.";
-      loginStatus.style.color = "red";
-    }
+    loginStatus.textContent = err.message || "No se pudo iniciar sesión.";
+    loginStatus.style.color = "red";
   }
 }
 
@@ -424,8 +419,6 @@ function logout() {
   currentClientId = null;
 
   if (userInfo) userInfo.textContent = "";
-  setUserBadgeVisible(false);
-
   if (storeSelect) storeSelect.innerHTML = "";
   if (clientSelect) clientSelect.innerHTML = "";
   if (clientSelectorSection) clientSelectorSection.style.display = "none";
@@ -437,6 +430,9 @@ function logout() {
   if (loginStatus) loginStatus.textContent = "";
   if (usernameInput) usernameInput.value = "";
   if (passwordInput) passwordInput.value = "";
+
+  // ✅ Ocultar UI flotante
+  setLoggedInUI(false);
 
   if (mainContent) mainContent.style.display = "none";
   if (loginPanel) loginPanel.style.display = "flex";
@@ -455,7 +451,7 @@ if (clientSelect) {
     if (currentStoreId) {
       loadSensors();
       refreshStatusOnly();
-    } else if (sensorsContainer) {
+    } else {
       sensorsContainer.innerHTML = "<p>No hay tiendas asociadas a este cliente.</p>";
     }
   });
@@ -474,12 +470,12 @@ if (storeSelect) {
 // ------------------------------
 async function loadSensors() {
   if (!currentStoreId) {
-    if (sensorsContainer) sensorsContainer.innerHTML = "<p>Selecciona una tienda para ver los datos.</p>";
+    sensorsContainer.innerHTML = "<p>Selecciona una tienda para ver los datos.</p>";
     return;
   }
 
   try {
-    if (sensorsContainer) sensorsContainer.innerHTML = "<p>Cargando datos de la tienda...</p>";
+    sensorsContainer.innerHTML = "<p>Cargando datos de la tienda...</p>";
 
     const urlCounters = `${COUNTERS_URL}?storeId=${encodeURIComponent(currentStoreId)}`;
     const urlStatus = `${STATUS_URL}?storeId=${encodeURIComponent(currentStoreId)}`;
@@ -495,27 +491,25 @@ async function loadSensors() {
     renderStoreCounters(counters, status);
   } catch (err) {
     console.error(err);
-    if (sensorsContainer) {
-      sensorsContainer.innerHTML =
-        `<p style="color:red;">No se pudieron cargar los datos de la tienda. Revisa el servidor.</p>`;
-    }
+    sensorsContainer.innerHTML =
+      `<p style="color:red;">No se pudieron cargar los datos de la tienda. Revisa el servidor.</p>`;
   }
 }
 
 function renderStoreCounters(counters, status) {
   const {
     storeId,
-    // ✅ estos YA vienen como CLIENTES (server resta niños + trabajadores)
+    // ✅ YA vienen como CLIENTES (restado en el server: total - niños - trabajadores)
     entradas = 0,
     salidas = 0,
     dentro = 0,
 
-    // ✅ aparte
+    // ✅ datos aparte
     inChild = 0,
     outChild = 0,
     workersIn = 0,
 
-    // debug opcional
+    // opcional debug si tu server los manda
     totalEntradas = null,
     totalSalidas = null,
   } = counters || {};
@@ -523,10 +517,9 @@ function renderStoreCounters(counters, status) {
   const online = !!status?.online;
   const sn = status?.sn || "SN desconocido";
 
-  if (!sensorsContainer) return;
   sensorsContainer.innerHTML = "";
 
-  // Leyenda
+  // Leyenda de estado sensor
   const legend = document.createElement("div");
   legend.className = "sensor-legend";
   legend.innerHTML = `
@@ -621,7 +614,7 @@ function renderStoreCounters(counters, status) {
 }
 
 // ------------------------------
-// Historial / Gráfico
+// Historial / Datos día
 // ------------------------------
 async function fetchHistory(dateStr) {
   if (!currentStoreId) throw new Error("No hay tienda seleccionada.");
@@ -655,10 +648,10 @@ async function loadHistory() {
       <p><strong>Entradas (clientes):</strong> ${entradas}</p>
       <p><strong>Salidas (clientes):</strong> ${salidas}</p>
       <p><strong>Dentro (estimado):</strong> ${dentro}</p>
-      <hr style="border:none;border-top:1px solid rgba(0,0,0,0.10);margin:10px 0;" />
+      <hr style="border:none;border-top:1px solid rgba(0,0,0,0.12);margin:10px 0;" />
       <p><strong>Niños entraron:</strong> ${Number(data.inChild || 0)}</p>
       <p><strong>Niños salieron:</strong> ${Number(data.outChild || 0)}</p>
-      <p><strong>Trabajadores (workcard):</strong> ${Number(data.workersIn || 0)}</p>
+      <p><strong>Trabajadores:</strong> ${Number(data.workersIn || 0)}</p>
     `;
   } catch (e) {
     historyResult.innerHTML = `<p style="color:red;">${e.message}</p>`;
@@ -703,7 +696,7 @@ function drawDonutChart(totals, dateStr) {
 
   const storeName = getStoreName(currentStoreId);
 
-  // Datos (orden pedido)
+  // Datos (orden)
   const items = [
     { label: "Clientes que entraron", value: totals.clientesEntraron, color: "#1C6DD0" },
     { label: "Clientes que salieron", value: totals.clientesSalieron, color: "#c0392b" },
@@ -735,7 +728,6 @@ function drawDonutChart(totals, dateStr) {
 
   let start = -Math.PI / 2;
 
-  // Slices
   for (const it of items) {
     const angle = (it.value / sum) * Math.PI * 2;
     const end = start + angle;
@@ -747,7 +739,7 @@ function drawDonutChart(totals, dateStr) {
     chartCtx.fillStyle = it.color;
     chartCtx.fill();
 
-    // % label (solo si es grande)
+    // % label (si slice es grande)
     const pct = (it.value / sum) * 100;
     if (pct >= 6) {
       const mid = (start + end) / 2;
@@ -762,7 +754,7 @@ function drawDonutChart(totals, dateStr) {
     start = end;
   }
 
-  // Agujero
+  // Agujero del donut
   chartCtx.beginPath();
   chartCtx.arc(cx, cy, innerR, 0, Math.PI * 2);
   chartCtx.fillStyle = "rgba(255,255,255,0.65)";
@@ -825,7 +817,6 @@ if (refreshSelect) {
   });
 }
 
-// Estado inicial de la UI
 if (sensorsContainer) {
   sensorsContainer.innerHTML = "<p>Inicia sesión para ver el contador de personas.</p>";
 }
