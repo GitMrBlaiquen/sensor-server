@@ -1,5 +1,12 @@
 // ==============================
-// app.js (reescrito / limpio)
+// app.js (FULL / reescrito)
+// - Login + admin/dueño + selector cliente/tienda
+// - Vistas (Tienda / Gráficos / Calendario)
+// - Polling de estado (online/offline) por store
+// - Muestra CLIENTES (server ya resta niños + trabajadores)
+// - Muestra TRABAJADORES y NIÑOS como datos aparte
+// - Gráfico profesional tipo DONUT (pie) con leyenda + %
+// - Evita que el user-badge aparezca en el login (se oculta hasta login)
 // ==============================
 
 // URL base de la API
@@ -26,7 +33,8 @@ const passwordInput = document.getElementById("passwordInput");
 const loginBtn = document.getElementById("loginBtn");
 const loginStatus = document.getElementById("loginStatus");
 
-// Usuario + logout
+// User badge (dentro del mainContent)
+const userBadge = document.querySelector(".user-badge");
 const userInfo = document.getElementById("userInfo");
 const logoutBtn = document.getElementById("logoutBtn");
 
@@ -37,13 +45,13 @@ const clientSelect = document.getElementById("clientSelect");
 // Selector de tienda
 const storeSelect = document.getElementById("storeSelect");
 
-// Modal de inactividad
+// Modal inactividad
 const sessionWarningModal = document.getElementById("sessionWarningModal");
 const stayLoggedBtn = document.getElementById("stayLoggedBtn");
 const logoutNowBtn = document.getElementById("logoutNowBtn");
 const countdownSpan = document.getElementById("countdownSeconds");
 
-// Menú y vistas
+// Menú / vistas
 const navButtons = document.querySelectorAll(".nav-btn");
 const views = document.querySelectorAll(".view");
 
@@ -74,6 +82,17 @@ let currentStoreId = null;
 // Solo admin
 let clients = [];
 let currentClientId = null;
+
+// ------------------------------
+// Helpers UI (mostrar/ocultar badge)
+// ------------------------------
+function setUserBadgeVisible(isVisible) {
+  if (!userBadge) return;
+  userBadge.style.display = isVisible ? "flex" : "none";
+}
+
+// Asegura estado inicial (por si el CSS lo muestra)
+setUserBadgeVisible(false);
 
 // ------------------------------
 // Utilidades: clientes/tiendas
@@ -158,7 +177,7 @@ function getStoreName(storeId) {
 }
 
 // ------------------------------
-// Menú lateral: cambiar vista
+// Menú: cambiar vista
 // ------------------------------
 function showView(viewId) {
   views.forEach((v) => v.classList.remove("active-view"));
@@ -180,8 +199,8 @@ navButtons.forEach((btn) => {
 // ------------------------------
 // Inactividad
 // ------------------------------
-const INACTIVITY_LIMIT_MS = 1 * 60 * 1000; // 1 minuto
-const WARNING_DURATION_MS = 30 * 1000; // 30 segundos
+const INACTIVITY_LIMIT_MS = 1 * 60 * 1000; // 1 min
+const WARNING_DURATION_MS = 30 * 1000; // 30 s
 
 let inactivityTimer = null;
 let logoutTimer = null;
@@ -236,7 +255,7 @@ if (stayLoggedBtn) stayLoggedBtn.addEventListener("click", () => resetInactivity
 if (logoutNowBtn) logoutNowBtn.addEventListener("click", () => logout());
 
 // ------------------------------
-// Polling estado (heartbeat)
+// Polling estado
 // ------------------------------
 function startStatusPolling() {
   stopStatusPolling();
@@ -271,7 +290,9 @@ async function refreshStatusOnly() {
     statusPill.classList.remove("status-on", "status-off");
     statusPill.classList.add(online ? "status-on" : "status-off");
     statusPill.textContent = online ? "🟢 Encendido" : "🔴 Apagado";
-  } catch {}
+  } catch {
+    // no rompemos UI
+  }
 }
 
 // ------------------------------
@@ -282,14 +303,18 @@ async function login() {
   const password = (passwordInput?.value || "").trim();
 
   if (!username || !password) {
-    loginStatus.textContent = "Ingresa usuario y contraseña.";
-    loginStatus.style.color = "red";
+    if (loginStatus) {
+      loginStatus.textContent = "Ingresa usuario y contraseña.";
+      loginStatus.style.color = "red";
+    }
     return;
   }
 
   try {
-    loginStatus.textContent = "Ingresando...";
-    loginStatus.style.color = "inherit";
+    if (loginStatus) {
+      loginStatus.textContent = "Ingresando...";
+      loginStatus.style.color = "inherit";
+    }
 
     const res = await fetch(LOGIN_URL, {
       method: "POST",
@@ -309,11 +334,14 @@ async function login() {
     currentStores = data.stores || [];
 
     if (currentStores.length === 0) {
-      loginStatus.textContent = "El usuario no tiene tiendas asignadas.";
-      loginStatus.style.color = "red";
+      if (loginStatus) {
+        loginStatus.textContent = "El usuario no tiene tiendas asignadas.";
+        loginStatus.style.color = "red";
+      }
       return;
     }
 
+    // Pintar usuario
     if (userInfo) {
       const roleLabel = currentRole === "admin" ? "Administrador" : "Dueño";
       userInfo.innerHTML = `
@@ -323,6 +351,7 @@ async function login() {
       `;
     }
 
+    // Admin: arma clientes
     if (currentRole === "admin") {
       clients = buildClientsFromStores(currentStores);
       if (clients.length > 0) {
@@ -340,9 +369,11 @@ async function login() {
       fillStoreSelectSimple();
     }
 
-    loginStatus.textContent = "";
+    // Mostrar app
+    if (loginStatus) loginStatus.textContent = "";
     if (loginPanel) loginPanel.style.display = "none";
     if (mainContent) mainContent.style.display = "block";
+    setUserBadgeVisible(true);
 
     showView("view-store");
 
@@ -356,13 +387,15 @@ async function login() {
     if (currentStoreId) {
       await loadSensors();
       refreshStatusOnly();
-    } else {
+    } else if (sensorsContainer) {
       sensorsContainer.innerHTML = "<p>No hay tiendas disponibles para este usuario.</p>";
     }
   } catch (err) {
     console.error(err);
-    loginStatus.textContent = err.message || "No se pudo iniciar sesión.";
-    loginStatus.style.color = "red";
+    if (loginStatus) {
+      loginStatus.textContent = err.message || "No se pudo iniciar sesión.";
+      loginStatus.style.color = "red";
+    }
   }
 }
 
@@ -391,6 +424,8 @@ function logout() {
   currentClientId = null;
 
   if (userInfo) userInfo.textContent = "";
+  setUserBadgeVisible(false);
+
   if (storeSelect) storeSelect.innerHTML = "";
   if (clientSelect) clientSelect.innerHTML = "";
   if (clientSelectorSection) clientSelectorSection.style.display = "none";
@@ -420,7 +455,7 @@ if (clientSelect) {
     if (currentStoreId) {
       loadSensors();
       refreshStatusOnly();
-    } else {
+    } else if (sensorsContainer) {
       sensorsContainer.innerHTML = "<p>No hay tiendas asociadas a este cliente.</p>";
     }
   });
@@ -439,12 +474,12 @@ if (storeSelect) {
 // ------------------------------
 async function loadSensors() {
   if (!currentStoreId) {
-    sensorsContainer.innerHTML = "<p>Selecciona una tienda para ver los datos.</p>";
+    if (sensorsContainer) sensorsContainer.innerHTML = "<p>Selecciona una tienda para ver los datos.</p>";
     return;
   }
 
   try {
-    sensorsContainer.innerHTML = "<p>Cargando datos de la tienda...</p>";
+    if (sensorsContainer) sensorsContainer.innerHTML = "<p>Cargando datos de la tienda...</p>";
 
     const urlCounters = `${COUNTERS_URL}?storeId=${encodeURIComponent(currentStoreId)}`;
     const urlStatus = `${STATUS_URL}?storeId=${encodeURIComponent(currentStoreId)}`;
@@ -460,43 +495,57 @@ async function loadSensors() {
     renderStoreCounters(counters, status);
   } catch (err) {
     console.error(err);
-    sensorsContainer.innerHTML =
-      `<p style="color:red;">No se pudieron cargar los datos de la tienda. Revisa el servidor.</p>`;
+    if (sensorsContainer) {
+      sensorsContainer.innerHTML =
+        `<p style="color:red;">No se pudieron cargar los datos de la tienda. Revisa el servidor.</p>`;
+    }
   }
 }
 
-/**
- * ✅ NUEVO RENDER:
- * - Izquierda: tarjeta compacta con Tienda + SN + Estado
- * - Derecha: 6 cuadros (stats) en el orden que pediste
- * - NO muestra debug ni "Última actualización"
- * - NO muestra el bloque grande de texto debajo de “Apagado”
- */
 function renderStoreCounters(counters, status) {
   const {
     storeId,
+    // ✅ estos YA vienen como CLIENTES (server resta niños + trabajadores)
     entradas = 0,
     salidas = 0,
     dentro = 0,
+
+    // ✅ aparte
     inChild = 0,
     outChild = 0,
     workersIn = 0,
+
+    // debug opcional
+    totalEntradas = null,
+    totalSalidas = null,
   } = counters || {};
 
   const online = !!status?.online;
   const sn = status?.sn || "SN desconocido";
-  const storeName = getStoreName(storeId);
 
+  if (!sensorsContainer) return;
   sensorsContainer.innerHTML = "";
 
-  // Contenedor layout (izq + derecha)
-  const wrap = document.createElement("section");
-  wrap.className = "store-dashboard";
+  // Leyenda
+  const legend = document.createElement("div");
+  legend.className = "sensor-legend";
+  legend.innerHTML = `
+    <span class="legend-item"><span class="status-pill status-on">🟢</span> Encendido</span>
+    <span class="legend-item"><span class="status-pill status-off">🔴</span> Apagado</span>
+  `;
+  sensorsContainer.appendChild(legend);
 
-  // Izquierda (tarjeta compacta)
-  const left = document.createElement("article");
-  left.className = "sensor-card sensor-card--compact";
-  left.innerHTML = `
+  const card = document.createElement("article");
+  card.className = "sensor-card";
+
+  const nowStr = new Date().toLocaleTimeString();
+  const storeName = getStoreName(storeId);
+
+  const showDebug = totalEntradas !== null || totalSalidas !== null;
+  const debugEntradas = totalEntradas ?? 0;
+  const debugSalidas = totalSalidas ?? 0;
+
+  card.innerHTML = `
     <div class="sensor-header">
       <div>
         <div class="sensor-id">${storeName}</div>
@@ -510,49 +559,65 @@ function renderStoreCounters(counters, status) {
         </div>
       </div>
     </div>
+
+    <div class="store-counters">
+
+      <div class="store-counter-item">
+        <span class="label">Clientes que han ENTRADO (sin niños ni trabajadores)</span>
+        <span class="value">${entradas}</span>
+      </div>
+
+      <div class="store-counter-item">
+        <span class="label">Clientes que han SALIDO (sin niños)</span>
+        <span class="value">${salidas}</span>
+      </div>
+
+      <div class="store-counter-item">
+        <span class="label">Clientes DENTRO (estimado)</span>
+        <span class="value">${dentro}</span>
+      </div>
+
+      <hr style="border:none;border-top:1px solid rgba(0,0,0,0.12);margin:10px 0;" />
+
+      <div class="store-counter-item">
+        <span class="label">Trabajadores detectados (workcard)</span>
+        <span class="value">${workersIn}</span>
+      </div>
+
+      <div class="store-counter-item">
+        <span class="label">Niños que han ENTRADO</span>
+        <span class="value">${inChild}</span>
+      </div>
+
+      <div class="store-counter-item">
+        <span class="label">Niños que han SALIDO</span>
+        <span class="value">${outChild}</span>
+      </div>
+
+      ${
+        showDebug
+          ? `
+        <hr style="border:none;border-top:1px solid rgba(0,0,0,0.10);margin:10px 0;" />
+        <div class="store-counter-item" style="opacity:0.75;">
+          <span class="label">Total ENTRADAS del sensor (debug)</span>
+          <span class="value">${debugEntradas}</span>
+        </div>
+        <div class="store-counter-item" style="opacity:0.75;">
+          <span class="label">Total SALIDAS del sensor (debug)</span>
+          <span class="value">${debugSalidas}</span>
+        </div>
+      `
+          : ""
+      }
+
+    </div>
+
+    <div class="sensor-meta">
+      Última actualización: ${nowStr}
+    </div>
   `;
 
-  // Derecha (6 cuadros)
-  const right = document.createElement("div");
-  right.className = "stats-grid";
-  right.innerHTML = `
-    <div class="stat-box">
-      <div class="stat-title">Clientes que entraron</div>
-      <div class="stat-value">${entradas}</div>
-    </div>
-
-    <div class="stat-box">
-      <div class="stat-title">Clientes que salieron</div>
-      <div class="stat-value">${salidas}</div>
-    </div>
-
-    <div class="stat-box">
-      <div class="stat-title">Clientes dentro</div>
-      <div class="stat-value">${dentro}</div>
-    </div>
-
-    <div class="stat-box">
-      <div class="stat-title">Niños que entraron</div>
-      <div class="stat-value">${inChild}</div>
-    </div>
-
-    <div class="stat-box">
-      <div class="stat-title">Niños que salieron</div>
-      <div class="stat-value">${outChild}</div>
-    </div>
-
-    <div class="stat-box">
-      <div class="stat-title">Trabajadores</div>
-      <div class="stat-value">${workersIn}</div>
-    </div>
-  `;
-
-  wrap.appendChild(left);
-  wrap.appendChild(right);
-  sensorsContainer.appendChild(wrap);
-
-  // refresca estado por si cambió (mantiene el polling)
-  // (no rompe si el polling llega antes/después)
+  sensorsContainer.appendChild(card);
 }
 
 // ------------------------------
@@ -590,20 +655,38 @@ async function loadHistory() {
       <p><strong>Entradas (clientes):</strong> ${entradas}</p>
       <p><strong>Salidas (clientes):</strong> ${salidas}</p>
       <p><strong>Dentro (estimado):</strong> ${dentro}</p>
+      <hr style="border:none;border-top:1px solid rgba(0,0,0,0.10);margin:10px 0;" />
+      <p><strong>Niños entraron:</strong> ${Number(data.inChild || 0)}</p>
+      <p><strong>Niños salieron:</strong> ${Number(data.outChild || 0)}</p>
+      <p><strong>Trabajadores (workcard):</strong> ${Number(data.workersIn || 0)}</p>
     `;
   } catch (e) {
     historyResult.innerHTML = `<p style="color:red;">${e.message}</p>`;
   }
 }
 
+// ------------------------------
+// GRÁFICO (PRO) tipo Donut + Leyenda
+// ------------------------------
 async function loadChart() {
   if (!chartCtx || !chartCanvas) return;
 
   try {
     chartCtx.clearRect(0, 0, chartCanvas.width, chartCanvas.height);
+
     const dateStr = chartDate?.value;
     const data = await fetchHistory(dateStr);
-    drawSimpleChart(data.byHour || {}, dateStr);
+
+    // Totales del día (vienen del server)
+    const totals = {
+      clientesEntraron: Number(data.entradas || 0),
+      clientesSalieron: Number(data.salidas || 0),
+      ninosEntraron: Number(data.inChild || 0),
+      ninosSalieron: Number(data.outChild || 0),
+      trabajadores: Number(data.workersIn || 0),
+    };
+
+    drawDonutChart(totals, dateStr);
   } catch (e) {
     chartCtx.clearRect(0, 0, chartCanvas.width, chartCanvas.height);
     chartCtx.fillStyle = "#0A2342";
@@ -612,82 +695,111 @@ async function loadChart() {
   }
 }
 
-function drawSimpleChart(byHour, dateStr) {
+function drawDonutChart(totals, dateStr) {
   const W = chartCanvas.width;
   const H = chartCanvas.height;
 
   chartCtx.clearRect(0, 0, W, H);
 
-  const hours = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
+  const storeName = getStoreName(currentStoreId);
 
-  let accE = 0;
-  let accS = 0;
-  const pointsE = [];
-  const pointsS = [];
+  // Datos (orden pedido)
+  const items = [
+    { label: "Clientes que entraron", value: totals.clientesEntraron, color: "#1C6DD0" },
+    { label: "Clientes que salieron", value: totals.clientesSalieron, color: "#c0392b" },
+    { label: "Niños que entraron", value: totals.ninosEntraron, color: "#16a085" },
+    { label: "Niños que salieron", value: totals.ninosSalieron, color: "#8e44ad" },
+    { label: "Trabajadores", value: totals.trabajadores, color: "#2c3e50" },
+  ].filter((x) => Number.isFinite(x.value) && x.value > 0);
 
-  hours.forEach((h) => {
-    const item = byHour[h] || { entradas: 0, salidas: 0 };
-    accE += Number(item.entradas || 0);
-    accS += Number(item.salidas || 0);
-    pointsE.push(accE);
-    pointsS.push(accS);
-  });
+  const sum = items.reduce((a, b) => a + b.value, 0);
 
-  const maxY = Math.max(1, ...pointsE, ...pointsS);
+  // Encabezado
+  chartCtx.fillStyle = "#0A2342";
+  chartCtx.font = "16px system-ui";
+  chartCtx.fillText(`${storeName} — ${dateStr}`, 20, 28);
+  chartCtx.font = "13px system-ui";
+  chartCtx.fillText("Distribución del día (Clientes / Niños / Trabajadores)", 20, 48);
 
-  const padL = 50,
-    padR = 15,
-    padT = 20,
-    padB = 45;
-  const plotW = W - padL - padR;
-  const plotH = H - padT - padB;
+  if (sum <= 0) {
+    chartCtx.font = "16px system-ui";
+    chartCtx.fillText("No hay datos para graficar en esta fecha.", 20, 90);
+    return;
+  }
 
-  chartCtx.strokeStyle = "rgba(0,0,0,0.25)";
-  chartCtx.lineWidth = 1;
+  // Donut a la izquierda
+  const cx = 220;
+  const cy = Math.floor(H / 2) + 10;
+  const outerR = 110;
+  const innerR = 55;
+
+  let start = -Math.PI / 2;
+
+  // Slices
+  for (const it of items) {
+    const angle = (it.value / sum) * Math.PI * 2;
+    const end = start + angle;
+
+    chartCtx.beginPath();
+    chartCtx.moveTo(cx, cy);
+    chartCtx.arc(cx, cy, outerR, start, end);
+    chartCtx.closePath();
+    chartCtx.fillStyle = it.color;
+    chartCtx.fill();
+
+    // % label (solo si es grande)
+    const pct = (it.value / sum) * 100;
+    if (pct >= 6) {
+      const mid = (start + end) / 2;
+      const tx = cx + Math.cos(mid) * (outerR + 18);
+      const ty = cy + Math.sin(mid) * (outerR + 18);
+
+      chartCtx.fillStyle = "#0A2342";
+      chartCtx.font = "12px system-ui";
+      chartCtx.fillText(`${pct.toFixed(0)}%`, tx - 10, ty + 4);
+    }
+
+    start = end;
+  }
+
+  // Agujero
   chartCtx.beginPath();
-  chartCtx.moveTo(padL, padT);
-  chartCtx.lineTo(padL, padT + plotH);
-  chartCtx.lineTo(padL + plotW, padT + plotH);
-  chartCtx.stroke();
+  chartCtx.arc(cx, cy, innerR, 0, Math.PI * 2);
+  chartCtx.fillStyle = "rgba(255,255,255,0.65)";
+  chartCtx.fill();
 
+  // Total al centro
   chartCtx.fillStyle = "#0A2342";
   chartCtx.font = "12px system-ui";
-  chartCtx.fillText(String(maxY), 10, padT + 5);
-  chartCtx.fillText("0", 22, padT + plotH);
+  chartCtx.fillText("Total", cx - 14, cy - 6);
+  chartCtx.font = "16px system-ui";
+  chartCtx.fillText(String(sum), cx - 10, cy + 14);
 
-  const xAt = (i) => padL + (i / 23) * plotW;
-  const yAt = (v) => padT + plotH - (v / maxY) * plotH;
+  // Leyenda a la derecha
+  const lx = 400;
+  let ly = 85;
 
-  // Entradas
-  chartCtx.strokeStyle = "#1C6DD0";
-  chartCtx.lineWidth = 2;
-  chartCtx.beginPath();
-  pointsE.forEach((v, i) => {
-    const x = xAt(i);
-    const y = yAt(v);
-    if (i === 0) chartCtx.moveTo(x, y);
-    else chartCtx.lineTo(x, y);
-  });
-  chartCtx.stroke();
-
-  // Salidas
-  chartCtx.strokeStyle = "#c0392b";
-  chartCtx.lineWidth = 2;
-  chartCtx.beginPath();
-  pointsS.forEach((v, i) => {
-    const x = xAt(i);
-    const y = yAt(v);
-    if (i === 0) chartCtx.moveTo(x, y);
-    else chartCtx.lineTo(x, y);
-  });
-  chartCtx.stroke();
-
-  const storeName = getStoreName(currentStoreId);
-  chartCtx.fillStyle = "#0A2342";
-  chartCtx.font = "14px system-ui";
-  chartCtx.fillText(`${storeName} — ${dateStr} (acumulado por hora)`, padL, H - 20);
   chartCtx.font = "13px system-ui";
-  chartCtx.fillText("Azul: Entradas | Rojo: Salidas", padL, H - 5);
+  chartCtx.fillStyle = "#0A2342";
+  chartCtx.fillText("Leyenda", lx, ly);
+  ly += 14;
+
+  for (const it of items) {
+    const pct = ((it.value / sum) * 100).toFixed(1);
+
+    chartCtx.fillStyle = it.color;
+    chartCtx.fillRect(lx, ly, 12, 12);
+
+    chartCtx.fillStyle = "#0A2342";
+    chartCtx.font = "13px system-ui";
+    chartCtx.fillText(`${it.label}`, lx + 18, ly + 11);
+
+    chartCtx.font = "12px system-ui";
+    chartCtx.fillStyle = "rgba(10,35,66,0.85)";
+    chartCtx.fillText(`Valor: ${it.value}  (${pct}%)`, lx + 18, ly + 28);
+
+    ly += 44;
+  }
 }
 
 if (loadHistoryBtn) loadHistoryBtn.addEventListener("click", loadHistory);
@@ -713,6 +825,7 @@ if (refreshSelect) {
   });
 }
 
+// Estado inicial de la UI
 if (sensorsContainer) {
   sensorsContainer.innerHTML = "<p>Inicia sesión para ver el contador de personas.</p>";
 }
