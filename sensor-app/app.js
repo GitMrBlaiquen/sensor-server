@@ -4,10 +4,10 @@
 // - Polling estado (heartbeat)
 // - Muestra CLIENTES (ya restado de niños + trabajadores desde el server)
 // - Muestra TRABAJADORES y NIÑOS como datos aparte
-// - Oculta user-badge y sidebar en login (para que NO se vean antes de loguear)
+// - user-badge + sidebar NO aparecen en login
+// - TIENDA: muestra datos en "cuadros" (cards) dentro del cuadro principal
 // ==============================
 
-// URL base de la API
 const BASE_URL = window.location.origin;
 // const BASE_URL = "http://localhost:10000";
 
@@ -35,7 +35,7 @@ const loginStatus = document.getElementById("loginStatus");
 const userInfo = document.getElementById("userInfo");
 const logoutBtn = document.getElementById("logoutBtn");
 
-// ✅ UI flotante (para ocultar en login)
+// UI flotante (para ocultar en login)
 const userBadgeEl = document.querySelector(".user-badge");
 const sidebarEl = document.querySelector(".sidebar");
 
@@ -85,17 +85,106 @@ let clients = [];
 let currentClientId = null;
 
 // ------------------------------
+// Mini-CSS (inyectado desde JS)
+// ------------------------------
+function ensureUiStyles() {
+  if (document.getElementById("appjs-ui-styles")) return;
+
+  const style = document.createElement("style");
+  style.id = "appjs-ui-styles";
+  style.textContent = `
+    .sensor-legend{
+      display:flex;
+      gap: 12px;
+      align-items:center;
+      margin: 6px 0 12px;
+      font-size: 0.95rem;
+      opacity: 0.9;
+    }
+    .legend-item{ display:inline-flex; gap: 6px; align-items:center; }
+    .status-pill{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-weight: 800;
+      font-size: 0.9rem;
+      border: 1px solid rgba(0,0,0,0.10);
+      background: rgba(255,255,255,0.55);
+    }
+    .status-on{ box-shadow: inset 0 0 0 2px rgba(21,171,31,0.20); }
+    .status-off{ box-shadow: inset 0 0 0 2px rgba(192,57,43,0.20); }
+
+    .sensor-right{
+      display:flex;
+      flex-direction:column;
+      align-items:flex-end;
+      gap: 8px;
+      min-width: 190px;
+    }
+    .sensor-sn{ font-size: 0.95rem; opacity: 0.95; }
+
+    /* ✅ GRID de “cuadros” de información */
+    .stats-grid{
+      margin-top: 12px;
+      display:grid;
+      grid-template-columns: repeat(3, minmax(160px, 1fr));
+      gap: 12px;
+    }
+    .stat-card{
+      background: rgba(255,255,255,0.45);
+      border: 1px solid rgba(0,0,0,0.10);
+      border-radius: 12px;
+      padding: 12px 12px;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.06);
+      display:flex;
+      flex-direction:column;
+      gap: 6px;
+      min-height: 74px;
+    }
+    .stat-title{
+      font-size: 0.9rem;
+      opacity: 0.85;
+      font-weight: 800;
+      line-height: 1.15;
+    }
+    .stat-value{
+      font-size: 1.6rem;
+      font-weight: 1000;
+      color: #1C6DD0;
+      line-height: 1;
+    }
+    .stat-value--ok{ color: #15AB1F; }
+    .stat-value--warn{ color: #c0392b; }
+    .stat-sub{
+      font-size: 0.85rem;
+      opacity: 0.78;
+    }
+
+    /* Ajuste responsive */
+    @media (max-width: 1100px){
+      .stats-grid{ grid-template-columns: repeat(2, minmax(160px, 1fr)); }
+    }
+    @media (max-width: 650px){
+      .stats-grid{ grid-template-columns: 1fr; }
+      .sensor-right{ align-items:flex-start; }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+// ------------------------------
 // Helpers UI: mostrar/ocultar cosas flotantes
 // ------------------------------
 function setLoggedInUI(isLoggedIn) {
-  // mainContent lo maneja login/logout
-  // pero forzamos ocultar/mostrar por si CSS fixed se ve igual
   if (userBadgeEl) userBadgeEl.style.display = isLoggedIn ? "flex" : "none";
   if (sidebarEl) sidebarEl.style.display = isLoggedIn ? "block" : "none";
 }
 
 // Al cargar la página: ocultar badge/menu (hasta login)
 setLoggedInUI(false);
+ensureUiStyles();
 
 // ------------------------------
 // Utilidades: clientes/tiendas
@@ -364,7 +453,6 @@ async function login() {
       fillStoreSelectSimple();
     }
 
-    // Mostrar UI principal
     loginStatus.textContent = "";
     if (loginPanel) loginPanel.style.display = "none";
     if (mainContent) mainContent.style.display = "block";
@@ -499,19 +587,20 @@ async function loadSensors() {
 function renderStoreCounters(counters, status) {
   const {
     storeId,
-    // ✅ YA vienen como CLIENTES (restado en el server: total - niños - trabajadores)
+
+    // ✅ CLIENTES (ya restado en server)
     entradas = 0,
     salidas = 0,
     dentro = 0,
 
-    // ✅ datos aparte
+    // ✅ aparte
     inChild = 0,
     outChild = 0,
     workersIn = 0,
 
-    // opcional debug si tu server los manda
-    totalEntradas = null,
-    totalSalidas = null,
+    // ✅ debug (RAW sensor)
+    totalEntradas = 0,
+    totalSalidas = 0,
   } = counters || {};
 
   const online = !!status?.online;
@@ -519,7 +608,7 @@ function renderStoreCounters(counters, status) {
 
   sensorsContainer.innerHTML = "";
 
-  // Leyenda de estado sensor
+  // Leyenda
   const legend = document.createElement("div");
   legend.className = "sensor-legend";
   legend.innerHTML = `
@@ -534,9 +623,67 @@ function renderStoreCounters(counters, status) {
   const nowStr = new Date().toLocaleTimeString();
   const storeName = getStoreName(storeId);
 
-  const showDebug = totalEntradas !== null || totalSalidas !== null;
-  const debugEntradas = totalEntradas ?? 0;
-  const debugSalidas = totalSalidas ?? 0;
+  // ✅ Cuadros de información (incluye lo “eliminado” en formato card)
+  const statsHtml = `
+    <div class="stats-grid">
+
+      <div class="stat-card">
+        <div class="stat-title">Clientes que han ENTRADO</div>
+        <div class="stat-value">${Number(entradas) || 0}</div>
+        <div class="stat-sub">Sin niños ni trabajadores</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-title">Clientes que han SALIDO</div>
+        <div class="stat-value">${Number(salidas) || 0}</div>
+        <div class="stat-sub">Sin niños</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-title">Clientes DENTRO</div>
+        <div class="stat-value">${Number(dentro) || 0}</div>
+        <div class="stat-sub">Estimado</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-title">Niños que han ENTRADO</div>
+        <div class="stat-value">${Number(inChild) || 0}</div>
+        <div class="stat-sub">Conteo separado</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-title">Niños que han SALIDO</div>
+        <div class="stat-value">${Number(outChild) || 0}</div>
+        <div class="stat-sub">Conteo separado</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-title">Trabajadores detectados</div>
+        <div class="stat-value">${Number(workersIn) || 0}</div>
+        <div class="stat-sub">Workcard</div>
+      </div>
+
+      <!-- ✅ Lo que “habíamos eliminado” vuelve aquí como cuadros -->
+      <div class="stat-card">
+        <div class="stat-title">Total ENTRADAS del sensor</div>
+        <div class="stat-value">${Number(totalEntradas) || 0}</div>
+        <div class="stat-sub">Debug (raw)</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-title">Total SALIDAS del sensor</div>
+        <div class="stat-value">${Number(totalSalidas) || 0}</div>
+        <div class="stat-sub">Debug (raw)</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-title">Última actualización</div>
+        <div class="stat-value stat-value--ok" style="font-size:1.1rem;">${nowStr}</div>
+        <div class="stat-sub">Hora local</div>
+      </div>
+
+    </div>
+  `;
 
   card.innerHTML = `
     <div class="sensor-header">
@@ -553,61 +700,7 @@ function renderStoreCounters(counters, status) {
       </div>
     </div>
 
-    <div class="store-counters">
-
-      <div class="store-counter-item">
-        <span class="label">Clientes que han ENTRADO (sin niños ni trabajadores)</span>
-        <span class="value">${entradas}</span>
-      </div>
-
-      <div class="store-counter-item">
-        <span class="label">Clientes que han SALIDO (sin niños)</span>
-        <span class="value">${salidas}</span>
-      </div>
-
-      <div class="store-counter-item">
-        <span class="label">Clientes DENTRO (estimado)</span>
-        <span class="value">${dentro}</span>
-      </div>
-
-      <hr style="border:none;border-top:1px solid rgba(0,0,0,0.12);margin:10px 0;" />
-
-      <div class="store-counter-item">
-        <span class="label">Trabajadores detectados (workcard)</span>
-        <span class="value">${workersIn}</span>
-      </div>
-
-      <div class="store-counter-item">
-        <span class="label">Niños que han ENTRADO</span>
-        <span class="value">${inChild}</span>
-      </div>
-
-      <div class="store-counter-item">
-        <span class="label">Niños que han SALIDO</span>
-        <span class="value">${outChild}</span>
-      </div>
-
-      ${
-        showDebug
-          ? `
-        <hr style="border:none;border-top:1px solid rgba(0,0,0,0.10);margin:10px 0;" />
-        <div class="store-counter-item" style="opacity:0.75;">
-          <span class="label">Total ENTRADAS del sensor (debug)</span>
-          <span class="value">${debugEntradas}</span>
-        </div>
-        <div class="store-counter-item" style="opacity:0.75;">
-          <span class="label">Total SALIDAS del sensor (debug)</span>
-          <span class="value">${debugSalidas}</span>
-        </div>
-      `
-          : ""
-      }
-
-    </div>
-
-    <div class="sensor-meta">
-      Última actualización: ${nowStr}
-    </div>
+    ${statsHtml}
   `;
 
   sensorsContainer.appendChild(card);
@@ -659,7 +752,7 @@ async function loadHistory() {
 }
 
 // ------------------------------
-// GRÁFICO (PRO) tipo Donut + Leyenda
+// GRÁFICO (Donut + Leyenda)
 // ------------------------------
 async function loadChart() {
   if (!chartCtx || !chartCanvas) return;
@@ -670,7 +763,6 @@ async function loadChart() {
     const dateStr = chartDate?.value;
     const data = await fetchHistory(dateStr);
 
-    // Totales del día (vienen del server)
     const totals = {
       clientesEntraron: Number(data.entradas || 0),
       clientesSalieron: Number(data.salidas || 0),
@@ -696,7 +788,6 @@ function drawDonutChart(totals, dateStr) {
 
   const storeName = getStoreName(currentStoreId);
 
-  // Datos (orden)
   const items = [
     { label: "Clientes que entraron", value: totals.clientesEntraron, color: "#1C6DD0" },
     { label: "Clientes que salieron", value: totals.clientesSalieron, color: "#c0392b" },
@@ -707,7 +798,6 @@ function drawDonutChart(totals, dateStr) {
 
   const sum = items.reduce((a, b) => a + b.value, 0);
 
-  // Encabezado
   chartCtx.fillStyle = "#0A2342";
   chartCtx.font = "16px system-ui";
   chartCtx.fillText(`${storeName} — ${dateStr}`, 20, 28);
@@ -720,7 +810,6 @@ function drawDonutChart(totals, dateStr) {
     return;
   }
 
-  // Donut a la izquierda
   const cx = 220;
   const cy = Math.floor(H / 2) + 10;
   const outerR = 110;
@@ -739,7 +828,6 @@ function drawDonutChart(totals, dateStr) {
     chartCtx.fillStyle = it.color;
     chartCtx.fill();
 
-    // % label (si slice es grande)
     const pct = (it.value / sum) * 100;
     if (pct >= 6) {
       const mid = (start + end) / 2;
@@ -754,20 +842,17 @@ function drawDonutChart(totals, dateStr) {
     start = end;
   }
 
-  // Agujero del donut
   chartCtx.beginPath();
   chartCtx.arc(cx, cy, innerR, 0, Math.PI * 2);
   chartCtx.fillStyle = "rgba(255,255,255,0.65)";
   chartCtx.fill();
 
-  // Total al centro
   chartCtx.fillStyle = "#0A2342";
   chartCtx.font = "12px system-ui";
   chartCtx.fillText("Total", cx - 14, cy - 6);
   chartCtx.font = "16px system-ui";
   chartCtx.fillText(String(sum), cx - 10, cy + 14);
 
-  // Leyenda a la derecha
   const lx = 400;
   let ly = 85;
 
